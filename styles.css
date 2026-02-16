@@ -1,21 +1,15 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap');
 
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
     --bg-dark: #0a0e27;
     --bg-darker: #050814;
     --accent-cyan: #00ffff;
     --accent-pink: #ff00ff;
-    --accent-yellow: #ffff00;
     --text-light: #e0e6ff;
     --text-muted: #7b8cde;
     --surface: #1a1f3a;
-    --surface-hover: #252b4a;
     --border: #2d3558;
 }
 
@@ -23,411 +17,168 @@ body {
     font-family: 'Space Mono', monospace;
     background: var(--bg-dark);
     color: var(--text-light);
-    height: 100vh;
-    width: 100vw;
-    background-image: 
-        radial-gradient(circle at 20% 50%, rgba(0, 255, 255, 0.1) 0%, transparent 50%),
-        radial-gradient(circle at 80% 80%, rgba(255, 0, 255, 0.1) 0%, transparent 50%);
+    height: 100vh; width: 100vw; overflow: hidden;
 }
 
 body::before {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-image: 
-        linear-gradient(var(--border) 1px, transparent 1px),
-        linear-gradient(90deg, var(--border) 1px, transparent 1px);
-    background-size: 50px 50px;
-    opacity: 0.3;
-    animation: gridMove 20s linear infinite;
-    pointer-events: none;
-    z-index: 1;
+    content: ''; position: fixed; inset: 0;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 50px 50px; opacity: 0.1; z-index: 1; pointer-events: none;
 }
 
-@keyframes gridMove {
-    0% { transform: translate(0, 0); }
-    100% { transform: translate(50px, 50px); }
-}
-
-.container {
-    position: relative;
-    z-index: 2;
-    width: 100vw;
-    height: 100vh;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-}
+.container { position: relative; z-index: 2; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
 
 .upload-zone {
-    background: var(--surface);
-    border: 3px dashed var(--border);
-    border-radius: 20px;
-    padding: 60px 40px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    position: relative;
-    overflow: hidden;
-    max-width: 600px;
+    background: var(--surface); border: 3px dashed var(--border); border-radius: 20px;
+    padding: 60px 40px; text-align: center; cursor: pointer; z-index: 10;
 }
 
-.upload-zone::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.1), transparent);
-    transition: left 0.5s ease;
+#videoSection { display: none; width: 100vw; height: 100vh; position: relative; z-index: 2; }
+.main-layout { display: flex; flex-direction: column; height: 100vh; }
+
+/* 75% Top Area */
+.video-area {
+    flex: 0 0 75%; 
+    min-height: 0; background: rgba(0, 0, 0, 0.4);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px; border-bottom: 2px solid var(--border);
 }
 
-.upload-zone:hover {
-    border-color: var(--accent-cyan);
-    background: var(--surface-hover);
-    transform: scale(1.01);
+.video-wrapper {
+    width: 100%; height: 100%; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; min-height: 0;
 }
 
-.upload-zone:hover::before {
-    left: 100%;
+video, #animationPreview {
+    max-width: 100%; max-height: calc(100% - 60px);
+    border-radius: 8px; border: 1px solid var(--border);
+    background: #000; object-fit: contain;
 }
 
-.upload-zone.dragover {
-    border-color: var(--accent-pink);
-    background: var(--surface-hover);
-    transform: scale(1.02);
+#animationPreview { border: 2px solid var(--accent-pink); box-shadow: 0 0 30px rgba(255, 0, 255, 0.2); }
+
+.nav-hint { margin-top: 10px; font-size: 0.7rem; color: var(--accent-cyan); text-transform: uppercase; text-align: center; line-height: 1.4; }
+
+/* 25% Bottom Area */
+.sprite-builder-area {
+    flex: 0 0 25%;
+    display: flex; flex-direction: column;
+    background: var(--bg-darker); padding: 15px 20px;
+    min-height: 0; /* Important pour flexbox */
 }
 
-.upload-icon { font-size: 4rem; margin-bottom: 20px; opacity: 0.6; }
-.upload-text { font-size: 1.3rem; margin-bottom: 10px; color: var(--text-light); }
-.upload-hint { color: var(--text-muted); font-size: 0.95rem; }
+.sprite-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.panel-title { font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 800; color: var(--accent-cyan); text-transform: uppercase; }
 
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-/* Loading Overlay */
-#loadingOverlay {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(5, 8, 20, 0.95);
-    z-index: 9999;
-    justify-content: center;
-    align-items: center;
-    flex-direction: column;
-}
-
-#loadingOverlay.active {
-    display: flex;
-}
-
-.loading-spinner {
-    width: 80px;
-    height: 80px;
-    border: 8px solid var(--border);
-    border-top-color: var(--accent-cyan);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
-
-.loading-text {
-    margin-top: 30px;
-    font-size: 1.5rem;
-    color: var(--accent-cyan);
-    font-weight: 700;
-}
-
-.loading-subtext {
-    margin-top: 10px;
-    color: var(--text-muted);
-    font-size: 1rem;
-}
-
-/* Video Section */
-#videoSection {
-    display: none;
-    width: 100vw;
-    height: 100vh;
-    overflow: hidden;
-    position: relative;
-    z-index: 2;
-}
-
-.main-layout {
-    display: flex;
-    width: 100%;
-    height: 100%;
-}
-
-.left-panel {
-    width: 40%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 30px;
-    background: transparent;
-    overflow: hidden;
-}
-
-.right-panel {
-    width: 60%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-}
-
-.video-container {
-    height: 75%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 30px;
-    background: transparent;
-}
-
-video {
-    max-width: 100%;
-    max-height: 100%;
-    width: auto;
-    height: auto;
-    border-radius: 10px;
-    border: 2px solid var(--border);
-}
-
-/* Frame Strip Timeline */
-.frame-strip-container {
-    height: 25%;
-    background: transparent;
-    padding: 20px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-}
-
-.frame-strip-viewport {
-    position: relative;
+.sprite-grid-container {
     flex: 1;
-    overflow: hidden;
-    mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
-    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
-    display: flex;
-    align-items: center;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0 0 10px 0; /* Pas de padding horizontal pour éviter le resize */
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border);
+    white-space: nowrap;
+    min-height: 0; /* Important pour flexbox */
+    
+    /* SCROLLBAR STYLÉE - Invisible par défaut mais stylée quand elle apparaît */
+    scrollbar-width: thin;
+    scrollbar-color: var(--accent-cyan) var(--border);
+    
+    /* Évite le resize du container */
+    scrollbar-gutter: stable;
 }
 
-.frame-strip {
-    display: flex;
-    gap: 10px;
-    position: absolute;
-    transition: transform 0.3s ease;
+/* Scrollbar pour WebKit (Chrome, Safari, Edge) */
+.sprite-grid-container::-webkit-scrollbar {
+    height: 6px;
+    background: transparent;
 }
 
-.frame-strip-item {
-    flex-shrink: 0;
-    width: 160px;
-    aspect-ratio: 1;
-    position: relative;
-    border: 2px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    background: var(--surface);
+.sprite-grid-container::-webkit-scrollbar-track {
+    background: var(--border);
+    border-radius: 3px;
 }
 
-.frame-strip-item:hover {
-    border-color: var(--accent-cyan);
-    z-index: 10;
-}
-
-.frame-strip-item.current {
-    border-color: var(--accent-cyan);
-    box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
-}
-
-.frame-strip-item canvas {
-    width: 100%;
-    height: 100%;
-    display: block;
-    object-fit: cover;
-}
-
-.frame-time {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: rgba(0, 0, 0, 0.8);
-    color: var(--accent-cyan);
-    text-align: center;
-    padding: 4px;
-    font-size: 0.75rem;
-    font-weight: 700;
-}
-
-.sprite-badge {
-    position: absolute;
-    top: 8px;
-    right: 8px;
+.sprite-grid-container::-webkit-scrollbar-thumb {
     background: var(--accent-cyan);
-    color: var(--bg-dark);
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 0.9rem;
-    z-index: 10;
-    box-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+    border-radius: 3px;
 }
 
-/* Sprite Sheet Builder */
-.sprite-builder {
-    width: 100%;
-    max-width: 500px;
-}
-
-.panel-title {
-    font-family: 'Syne', sans-serif;
-    font-size: 1.5rem;
-    font-weight: 800;
-    text-align: center;
-    margin-bottom: 30px;
-    color: var(--accent-cyan);
-    text-transform: uppercase;
-    letter-spacing: 3px;
+.sprite-grid-container::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-pink);
 }
 
 .sprite-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 15px;
-    margin-bottom: 30px;
+    display: inline-flex;
+    gap: 10px;
+    min-width: min-content;
+    height: 100%;
+    align-items: center;
+    padding: 0 10px; /* Padding ici au lieu du container */
 }
 
+/* Forced SQUARE Slots */
 .sprite-slot {
-    aspect-ratio: 1;
-    border: 3px dashed var(--border);
-    border-radius: 12px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
+    width: 100px;
+    height: 100px;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
     background: var(--surface);
     position: relative;
+    cursor: pointer;
     overflow: hidden;
+    transition: all 0.2s ease;
 }
 
 .sprite-slot:hover {
     border-color: var(--accent-cyan);
-    background: var(--surface-hover);
+    transform: scale(1.02);
 }
 
-.sprite-slot.drag-over {
-    border-color: var(--accent-pink);
-    background: var(--surface-hover);
-    transform: scale(1.05);
+.sprite-slot.impact-frame { 
+    border: 2px solid var(--accent-pink); 
+    box-shadow: 0 0 15px rgba(255, 0, 255, 0.6);
 }
 
-.sprite-slot canvas {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+/* Do not deform thumbnail - keep aspect even if it doesn't fit */
+.sprite-slot canvas, .sprite-slot img {
+    width: 100%; height: 100%; display: block;
+    object-fit: cover; 
 }
 
 .sprite-slot-number {
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    background: var(--accent-cyan);
-    color: var(--bg-dark);
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 0.9rem;
-    z-index: 10;
+    position: absolute; top: 4px; left: 4px; background: var(--accent-cyan);
+    color: var(--bg-dark); font-size: 0.5rem; font-weight: bold; padding: 1px 4px; border-radius: 2px; z-index: 5;
 }
 
-.sprite-slot.filled {
-    border-style: solid;
-    border-color: var(--accent-cyan);
+.delete-btn {
+    position: absolute; top: 4px; right: 4px; width: 18px; height: 18px;
+    background: rgba(0,0,0,0.8); color: white; display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; font-size: 12px; z-index: 10; cursor: pointer;
 }
+.delete-btn:hover { background: var(--accent-pink); }
 
-.sprite-actions {
-    display: flex;
-    gap: 15px;
-    justify-content: center;
-}
-
+/* Buttons */
+.sprite-actions { display: flex; gap: 10px; }
 .btn-primary, .btn-secondary {
-    font-family: 'Space Mono', monospace;
-    padding: 15px 35px;
-    border: none;
-    border-radius: 8px;
-    font-weight: 700;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+    padding: 8px 15px; font-family: 'Space Mono', monospace; font-size: 0.7rem;
+    font-weight: 700; border: none; border-radius: 4px; cursor: pointer; text-transform: uppercase;
+    transition: all 0.2s ease;
 }
+.btn-primary { background: var(--accent-cyan); color: var(--bg-dark); }
+.btn-primary:hover:not(:disabled) { background: var(--accent-pink); color: white; }
+.btn-primary:disabled { opacity: 0.2; cursor: not-allowed; }
+.btn-secondary { background: transparent; border: 1px solid var(--border); color: #fff; }
+.btn-secondary:hover:not(:disabled) { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+.btn-secondary:disabled { opacity: 0.2; }
 
-.btn-primary {
-    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-pink));
-    color: var(--bg-dark);
+#loadingOverlay {
+    display: none; position: fixed; inset: 0; background: var(--bg-darker);
+    z-index: 9999; flex-direction: column; justify-content: center; align-items: center;
 }
-
-.btn-primary:hover:not(:disabled) {
-    transform: scale(1.05);
-    box-shadow: 0 5px 20px rgba(0, 255, 255, 0.4);
+#loadingOverlay.active { display: flex; }
+.loading-spinner {
+    width: 40px; height: 40px; border: 4px solid var(--border);
+    border-top-color: var(--accent-cyan); border-radius: 50%; animation: spin 1s linear infinite;
 }
-
-.btn-primary:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
-}
-
-.btn-secondary {
-    background: var(--surface);
-    color: var(--text-light);
-    border: 2px solid var(--border);
-}
-
-.btn-secondary:hover {
-    border-color: var(--accent-cyan);
-    background: var(--surface-hover);
-}
-
-#spriteSheetPreview {
-    text-align: center;
-}
-
-#finalSpriteCanvas {
-    max-width: 100%;
-    border: 2px solid var(--accent-pink);
-    border-radius: 10px;
-    background: var(--surface);
-}
+@keyframes spin { to { transform: rotate(360deg); } }

@@ -7,79 +7,60 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <!-- Loading Overlay -->
     <div id="loadingOverlay">
         <div class="loading-spinner"></div>
-        <div class="loading-text">PROCESSING...</div>
-        <div class="loading-subtext">Extracting keyframes from your video</div>
+        <div class="loading-text"></div>
+        <div class="loading-subtext"></div>
     </div>
 
-    <!-- Upload Section -->
     <div class="container" id="uploadContainer">
         <div class="upload-zone" id="uploadZone">
-            <div class="upload-icon">🎬</div>
-            <div class="upload-text">Drop your video here</div>
-            <div class="upload-hint">or click to browse • MP4, MOV, WebM supported</div>
+            <div class="upload-icon"></div>
+            <div class="upload-text">+</div>
+            <div class="upload-hint"></div>
             <input type="file" id="videoInput" accept="video/*" style="display: none;">
         </div>
     </div>
 
-    <!-- Video Section -->
     <div id="videoSection">
         <div class="main-layout">
-            <!-- Left Panel: Sprite Sheet Builder -->
-            <div class="left-panel">
-                <div class="sprite-builder">
-                    <h2 class="panel-title">SPRITE SHEET BUILDER</h2>
-                    <div class="sprite-grid">
-                        <div class="sprite-slot" data-slot="0">
-                            <span class="sprite-slot-number">1</span>
-                            <span style="font-size: 2rem;">+</span>
-                        </div>
-                        <div class="sprite-slot" data-slot="1">
-                            <span class="sprite-slot-number">2</span>
-                            <span style="font-size: 2rem;">+</span>
-                        </div>
-                        <div class="sprite-slot" data-slot="2">
-                            <span class="sprite-slot-number">3</span>
-                            <span style="font-size: 2rem;">+</span>
-                        </div>
-                        <div class="sprite-slot" data-slot="3">
-                            <span class="sprite-slot-number">4</span>
-                            <span style="font-size: 2rem;">+</span>
-                        </div>
-                        <div class="sprite-slot" data-slot="4">
-                            <span class="sprite-slot-number">5</span>
-                            <span style="font-size: 2rem;">+</span>
-                        </div>
-                        <div class="sprite-slot" data-slot="5">
-                            <span class="sprite-slot-number">6</span>
-                            <span style="font-size: 2rem;">+</span>
-                        </div>
-                    </div>
+            <!-- TOP AREA (75%) -->
+            <div class="video-area">
+                <div class="video-wrapper">
+                    <video id="videoPlayer" controls muted></video>
+                    <canvas id="animationPreview" style="display: none;"></canvas>
                     
-                    <div class="sprite-actions">
-                        <button id="resetSpriteBtn" class="btn-secondary">Reset</button>
-                        <button id="generateSpriteBtn" class="btn-primary" disabled>Generate</button>
+                    <div class="nav-hint" id="navHint">Arrows [←] [→] to Seek • [↑] or [Enter] to Capture</div>
+                    <div class="nav-hint" id="previewHint" style="display: none;">
+                        <span style="color: var(--accent-pink); font-weight: bold;">PREVIEW MODE</span><br>
+                        <span id="fpsDisplay" style="color: var(--accent-cyan);">12 FPS</span><br>
+                        <span style="font-size: 0.6rem; opacity: 0.8;">Use [←] [→] to change speed</span>
                     </div>
                 </div>
             </div>
-
-            <!-- Right Panel: Video + Frame Strip -->
-            <div class="right-panel">
-                <div class="video-container">
-                    <video id="videoPlayer" controls muted></video>
+            
+            <!-- BOTTOM AREA (25%) -->
+            <div class="sprite-builder-area">
+                <div class="sprite-header">
+                    <div class="title-group">
+                        <h2 class="panel-title">Sprite Builder</h2>
+                        <span id="frameCounter" style="font-size: 0.8rem; color: var(--text-muted); margin-left: 10px;">0 frames</span>
+                    </div>
+                    <div class="sprite-actions">
+                        <button id="resetSpriteBtn" class="btn-secondary">Reset</button>
+                        <button id="previewBtn" class="btn-secondary" disabled>Preview Animation</button>
+                        <button id="generateSpriteBtn" class="btn-primary" disabled>Generate PNG</button>
+                    </div>
                 </div>
                 
-                <div class="frame-strip-container">
-                    <div class="frame-strip-viewport">
-                        <div class="frame-strip" id="frameStrip"></div>
-                    </div>
+                <div class="sprite-grid-container">
+                    <div class="sprite-grid" id="spriteGrid"></div>
                 </div>
             </div>
         </div>
     </div>
 
+    <script src="loadingmessages.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
