@@ -24,7 +24,7 @@
             </div>
             <div class="upload-text">Drop Video Here</div>
             <div class="upload-hint">or click to browse • MP4, MOV, WebM</div>
-            <input type="file" id="videoInput" accept="video/*" style="display: none;">
+            <input type="file" id="videoInput" accept="video/*">
         </div>
     </div>
 
@@ -45,40 +45,40 @@
             </svg>
         </div>
         
-            <!-- SIDE CONTROLS PANEL -->
-            <div class="side-controls">
-                <div class="side-controls-title">Controls</div>
-                <div class="side-controls-section">
-                    <div class="side-ctrl-label">Navigate</div>
-                    <div class="side-ctrl-row"><span class="hint-key">←</span><span class="hint-key">→</span> <span>Frame step</span></div>
-                    <div class="side-ctrl-row"><span class="hint-key">Shift</span> + <span class="hint-key">←</span><span class="hint-key">→</span> <span>Seek mode</span></div>
-                    <div class="side-ctrl-row"><span class="hint-key">↑</span><span class="hint-key">↓</span> <span>Seek speed</span></div>
-                </div>
-                <div class="side-controls-section">
-                    <div class="side-ctrl-label">Capture</div>
-                    <div class="side-ctrl-row"><span class="hint-key">↑</span> <span>Capture frame</span></div>
-                    <div class="side-ctrl-row">Hold <span class="hint-key">↑</span> <span>Range mode</span></div>
-                    <div class="side-ctrl-row"><span class="hint-key">↓</span> <span>Delete last</span></div>
-                </div>
-                <div class="side-controls-section">
-                    <div class="side-ctrl-label">Export</div>
-                    <div class="side-ctrl-row"><span class="hint-key">Enter</span> <span>Sheet / Screenshot</span></div>
-                    <div class="side-ctrl-row"><span class="hint-key">⇧ Enter</span> <span>Individuals ZIP</span></div>
-                </div>
-                <div class="side-controls-section">
-                    <div class="side-ctrl-label">Other</div>
-                    <div class="side-ctrl-row"><span class="hint-key">Space</span> <span>Preview</span></div>
-                    <div class="side-ctrl-row"><span class="hint-key">⌫</span> <span>Clear timeline</span></div>
-                    <div class="side-ctrl-row"><span class="hint-key">Esc</span> <span>Reset</span></div>
-                </div>
+        <!-- SIDE CONTROLS PANEL -->
+        <div class="side-controls">
+            <div class="side-controls-title">Controls</div>
+            <div class="side-controls-section">
+                <div class="side-ctrl-label">Navigate</div>
+                <div class="side-ctrl-row"><span class="hint-key">←</span><span class="hint-key">→</span> <span>Frame step</span></div>
+                <div class="side-ctrl-row"><span class="hint-key">Shift</span> + <span class="hint-key">←</span><span class="hint-key">→</span> <span>Seek mode</span></div>
+                <div class="side-ctrl-row"><span class="hint-key">↑</span><span class="hint-key">↓</span> <span>Seek speed</span></div>
             </div>
+            <div class="side-controls-section">
+                <div class="side-ctrl-label">Capture</div>
+                <div class="side-ctrl-row"><span class="hint-key">↑</span> <span>Capture frame</span></div>
+                <div class="side-ctrl-row">Hold <span class="hint-key">↑</span> <span>Range mode</span></div>
+                <div class="side-ctrl-row"><span class="hint-key">↓</span> <span>Delete last</span></div>
+            </div>
+            <div class="side-controls-section">
+                <div class="side-ctrl-label">Export</div>
+                <div class="side-ctrl-row"><span class="hint-key">Enter</span> <span>Sheet / Screenshot</span></div>
+                <div class="side-ctrl-row"><span class="hint-key">⇧ Enter</span> <span>Individuals ZIP</span></div>
+            </div>
+            <div class="side-controls-section">
+                <div class="side-ctrl-label">Other</div>
+                <div class="side-ctrl-row"><span class="hint-key">Space</span> <span>Preview</span></div>
+                <div class="side-ctrl-row"><span class="hint-key">⌫</span> <span>Clear timeline</span></div>
+                <div class="side-ctrl-row"><span class="hint-key">Esc</span> <span>Reset</span></div>
+            </div>
+        </div>
 
-            <div class="main-layout">
+        <div class="main-layout">
             <!-- TOP AREA (75%) -->
             <div class="video-area">
                 <div class="video-wrapper">
                     <video id="videoPlayer" controls muted></video>
-                    <canvas id="animationPreview" style="display: none;"></canvas>
+                    <canvas id="animationPreview"></canvas>
                     
                     <div class="nav-hint" id="navHint">
                         <span class="hint-key">←</span> <span class="hint-key">→</span> to Seek
@@ -87,10 +87,10 @@
                         <span class="hint-separator">•</span>
                         Hold <span class="hint-key">↑</span> for Range
                     </div>
-                    <div class="nav-hint" id="previewHint" style="display: none;">
-                        <span style="color: var(--accent-pink); font-weight: bold;">◉ PREVIEW MODE</span><br>
-                        <span id="fpsDisplay" style="color: var(--accent-cyan);">12 FPS</span><br>
-                        <span style="font-size: 0.6rem; opacity: 0.8;">Use <span class="hint-key">←</span> <span class="hint-key">→</span> to change speed</span>
+                    <div class="nav-hint preview-hint" id="previewHint">
+                        <span class="preview-hint-label">◉ PREVIEW MODE</span><br>
+                        <span id="fpsDisplay">12 FPS</span><br>
+                        <span class="preview-hint-sub">Use <span class="hint-key">←</span> <span class="hint-key">→</span> to change speed</span>
                     </div>
                 </div>
             </div>

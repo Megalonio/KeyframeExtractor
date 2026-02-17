@@ -246,7 +246,7 @@ video, #animationPreview {
     background: #000; 
     object-fit: contain;
     box-shadow: 0 10px 50px rgba(0, 0, 0, 0.5);
-    transition: all 0.3s ease;
+    transition: opacity 0.3s ease, transform 0.1s ease;
 }
 
 video:hover {
@@ -302,6 +302,33 @@ video:hover {
 .hint-separator {
     margin: 0 8px;
     opacity: 0.5;
+}
+
+/* Initial hidden states (replaces inline style="display:none") */
+#videoInput        { display: none; }
+#animationPreview  { display: none; }
+#previewHint       { display: none; }
+
+/* Preview hint text styles (replaces inline styles) */
+.preview-hint-label {
+    color: var(--accent-pink);
+    font-weight: bold;
+}
+
+#fpsDisplay {
+    color: var(--accent-cyan);
+    transition: color 0.15s ease, transform 0.15s ease;
+    display: inline-block;
+}
+
+#fpsDisplay.fps-flash {
+    color: var(--accent-pink);
+    transform: scale(1.2);
+}
+
+.preview-hint-sub {
+    font-size: 0.6rem;
+    opacity: 0.8;
 }
 
 /* Side controls panel */
@@ -421,7 +448,12 @@ video:hover {
     padding: 4px 10px;
     border-radius: 4px;
     border: 1px solid var(--border);
-    transition: all 0.3s ease;
+    transition: all 0.3s ease, transform 0.15s ease;
+    display: inline-block;
+}
+
+.frame-badge.badge-pop {
+    transform: scale(1.2);
 }
 
 .frame-badge.has-frames {
@@ -538,13 +570,6 @@ video:hover {
     }
 }
 
-.sprite-slot:nth-child(1) { animation-delay: 0s; }
-.sprite-slot:nth-child(2) { animation-delay: 0.05s; }
-.sprite-slot:nth-child(3) { animation-delay: 0.1s; }
-.sprite-slot:nth-child(4) { animation-delay: 0.15s; }
-.sprite-slot:nth-child(5) { animation-delay: 0.2s; }
-.sprite-slot:nth-child(n+6) { animation-delay: 0.25s; }
-
 .sprite-slot:hover {
     border-color: var(--accent-cyan);
     transform: scale(1.05) translateY(-2px);
@@ -585,7 +610,7 @@ video:hover {
     50% { transform: scale(1.2); opacity: 0.7; }
 }
 
-.sprite-slot canvas, .sprite-slot img {
+.sprite-slot canvas {
     width: 100%; 
     height: 100%; 
     display: block;
@@ -593,8 +618,7 @@ video:hover {
     transition: transform 0.2s ease;
 }
 
-.sprite-slot:hover canvas,
-.sprite-slot:hover img {
+.sprite-slot:hover canvas {
     transform: scale(1.05);
 }
 
@@ -645,6 +669,16 @@ video:hover {
     border-color: var(--accent-pink);
     transform: scale(1.1);
     box-shadow: 0 0 10px rgba(255, 0, 255, 0.5);
+}
+
+video.capture-flash {
+    transform: scale(0.98);
+}
+
+.sprite-slot.slot-removing {
+    transform: scale(0.8);
+    opacity: 0;
+    transition: transform 0.2s ease, opacity 0.2s ease;
 }
 
 /* Buttons */

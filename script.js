@@ -299,13 +299,9 @@ function updateFpsDisplay() {
     fpsDisplay.textContent = `${currentPreviewFps} FPS`;
     localStorage.setItem('preferredFps', currentPreviewFps);
     
-    // Pulse effect on change
-    fpsDisplay.style.transform = 'scale(1.2)';
-    fpsDisplay.style.color = 'var(--accent-pink)';
-    setTimeout(() => {
-        fpsDisplay.style.transform = 'scale(1)';
-        fpsDisplay.style.color = 'var(--accent-cyan)';
-    }, 150);
+    // Pulse effect via CSS class
+    fpsDisplay.classList.add('fps-flash');
+    setTimeout(() => fpsDisplay.classList.remove('fps-flash'), 150);
 }
 
 // Global Controls
@@ -636,11 +632,9 @@ function captureCurrentFrame() {
     canvas.getContext('2d').drawImage(videoPlayer, 0, 0);
     spriteSheetFrames.push({ canvas });
     
-    // Haptic-like feedback
-    videoPlayer.style.transform = 'scale(0.98)';
-    setTimeout(() => {
-        videoPlayer.style.transform = 'scale(1)';
-    }, 100);
+    // Haptic-like feedback via CSS class
+    videoPlayer.classList.add('capture-flash');
+    setTimeout(() => videoPlayer.classList.remove('capture-flash'), 100);
     
     rebuildSpriteGrid();
     updateUI();
@@ -746,10 +740,8 @@ function rebuildSpriteGrid() {
         del.onclick = (e) => {
             e.stopPropagation();
             
-            // Animate out
-            slot.style.animation = 'none';
-            slot.style.transform = 'scale(0.8)';
-            slot.style.opacity = '0';
+            // Animate out via CSS class
+            slot.classList.add('slot-removing');
             
             setTimeout(() => {
                 spriteSheetFrames.splice(index, 1);
@@ -810,19 +802,10 @@ function updateUI() {
     // Update frame counter with animation
     const newCount = `${spriteSheetFrames.length} frame${spriteSheetFrames.length !== 1 ? 's' : ''}`;
     if (frameCounter.textContent !== newCount) {
-        frameCounter.style.transform = 'scale(1.2)';
         frameCounter.textContent = newCount;
-        
-        // Add badge style if has frames
-        if (hasFrames) {
-            frameCounter.classList.add('has-frames');
-        } else {
-            frameCounter.classList.remove('has-frames');
-        }
-        
-        setTimeout(() => {
-            frameCounter.style.transform = 'scale(1)';
-        }, 150);
+        frameCounter.classList.toggle('has-frames', hasFrames);
+        frameCounter.classList.add('badge-pop');
+        setTimeout(() => frameCounter.classList.remove('badge-pop'), 150);
     }
 }
 
@@ -907,10 +890,6 @@ function generateSpriteSheet() {
 }
 
 generateSpriteBtn.addEventListener('click', generateSpriteSheet);
-
-// Add smooth transitions to video and preview
-videoPlayer.style.transition = 'opacity 0.3s ease, transform 0.1s ease';
-animationPreview.style.transition = 'opacity 0.3s ease';
 
 // Initialize
 updateUI();
