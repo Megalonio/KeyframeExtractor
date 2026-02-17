@@ -7,8 +7,10 @@ const videoPlayer = document.getElementById('videoPlayer');
 const animationPreview = document.getElementById('animationPreview');
 const loadingOverlay = document.getElementById('loadingOverlay');
 const resetSpriteBtn = document.getElementById('resetSpriteBtn');
+const clearFramesBtn = document.getElementById('clearFramesBtn');
 const previewBtn = document.getElementById('previewBtn');
 const generateSpriteBtn = document.getElementById('generateSpriteBtn');
+const exportIndividualBtn = document.getElementById('exportIndividualBtn');
 const spriteGrid = document.getElementById('spriteGrid');
 const navHint = document.getElementById('navHint');
 const previewHint = document.getElementById('previewHint');
@@ -42,6 +44,26 @@ const VIDEO_NAV_STEP = 1 / 24;
 let rangeStartTime = null;
 let rangeStartIndex = null;
 let rangeModeIndicator = null;
+
+// Hold-up range mode state
+let upHoldTimer = null;
+const UP_HOLD_DELAY = 300; // ms hold before range mode activates
+
+// ─── Seek Mode Config (edit these) ─────────────────────────────────────────
+const SEEK_INTERVAL_MS = 100;  // how often (ms) the video jumps in seek mode
+const SEEK_PHASES = [
+    { step: 1,    label: '1s/step'  },
+    { step: 2.5,  label: '2.5s/step' },
+    { step: 5,    label: '5s/step'  },
+    { step: 10,   label: '10s/step' },
+];
+
+// Seek runtime state (don't edit)
+let isSeekMode       = false;  // true while Shift is held
+let seekPhaseIndex   = 0;      // which SEEK_PHASES entry is active
+let seekStepInterval = null;   // interval driving movement
+let seekDirection    = 0;      // -1 or +1, set when arrow pressed in seek mode
+let seekModeIndicator = null;
 
 // Persistent FPS State
 let currentPreviewFps = parseInt(localStorage.getItem('preferredFps')) || 12;
@@ -98,6 +120,9 @@ function loadVideo(file) {
         { main: 'PROCESSING', sub: 'Building frame buffer...' }
     ];
     
+    loadingText.textContent = messages[0].main;
+    loadingSubtext.textContent = messages[0].sub;
+    
     let msgIndex = 0;
     const msgInterval = setInterval(() => {
         msgIndex = (msgIndex + 1) % messages.length;
@@ -125,10 +150,6 @@ function loadVideo(file) {
 }
 
 resetSpriteBtn.addEventListener('click', () => {
-    if (spriteSheetFrames.length > 0) {
-        // Confirmation feel
-        if (!confirm('Clear all frames? This cannot be undone.')) return;
-    }
     playSfx('back');
     
     videoPlayer.src = "";
@@ -148,6 +169,56 @@ resetSpriteBtn.addEventListener('click', () => {
     }, 300);
     
     videoInput.value = ""; 
+});
+
+// Clear all frames without resetting video
+clearFramesBtn.addEventListener('click', () => {
+    if (spriteSheetFrames.length === 0) return;
+    playSfx('back');
+    spriteSheetFrames = [];
+    impactFrameIndex = -1;
+    rangeStartTime = null;
+    rangeStartIndex = null;
+    hideRangeModeIndicator();
+    stopPreview();
+    rebuildSpriteGrid();
+    updateUI();
+});
+
+// Export each frame as individual PNGs inside a ZIP
+exportIndividualBtn.addEventListener('click', async () => {
+    if (spriteSheetFrames.length === 0) return;
+    
+    const loadingText = document.querySelector('.loading-text');
+    const loadingSubtext = document.querySelector('.loading-subtext');
+    loadingText.textContent = 'ZIPPING';
+    loadingSubtext.textContent = `Packing ${spriteSheetFrames.length} frames...`;
+    loadingOverlay.classList.add('active');
+    
+    const ordered = getOrderedFrames();
+    const zip = new JSZip();
+    
+    for (let i = 0; i < ordered.length; i++) {
+        const canvas = ordered[i].canvas;
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        const arrayBuffer = await blob.arrayBuffer();
+        const padded = String(i + 1).padStart(3, '0');
+        zip.file(`frame_${padded}.png`, arrayBuffer);
+        loadingSubtext.textContent = `Packed ${i + 1}/${ordered.length} frames...`;
+    }
+    
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(zipBlob);
+    const link = document.createElement('a');
+    link.download = `frames_${ordered.length}x.zip`;
+    link.href = url;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+    playSfx('chord');
+    
+    loadingText.textContent = 'SUCCESS';
+    loadingSubtext.textContent = `${ordered.length} PNGs zipped!`;
+    setTimeout(() => loadingOverlay.classList.remove('active'), 800);
 });
 
 function getOrderedFrames() {
@@ -239,17 +310,29 @@ function updateFpsDisplay() {
 
 // Global Controls
 function showNavArrow(direction) {
-    const arrow = direction === 'left' ? 
-        document.getElementById('navArrowLeft') : 
-        document.getElementById('navArrowRight');
-    
+    const arrowLeft  = document.getElementById('navArrowLeft');
+    const arrowRight = document.getElementById('navArrowRight');
+
+    if (isSeekMode) {
+        // In seek mode: persistent double-arrow only on the active direction
+        arrowLeft.classList.toggle('seek-hold', direction === 'left');
+        arrowRight.classList.toggle('seek-hold', direction === 'right');
+        return;
+    }
+
+    // Normal mode: snap to full opacity, then fade out
+    const arrow = direction === 'left' ? arrowLeft : arrowRight;
     arrow.classList.remove('show');
-    void arrow.offsetWidth; // Trigger reflow
-    arrow.classList.add('show');
-    
-    setTimeout(() => {
-        arrow.classList.remove('show');
-    }, 400);
+    arrow.style.opacity = '1';
+    arrow.style.animation = 'none';
+    // Small delay so the browser paints opacity:1 before starting fade-out
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            arrow.style.animation = '';
+            arrow.style.opacity  = '';
+            arrow.classList.add('show');
+        });
+    });
 }
 
 function showRangeModeIndicator() {
@@ -280,9 +363,67 @@ function hideRangeModeIndicator() {
 document.addEventListener('keydown', (e) => {
     if (!videoPlayer.src) return;
 
+    // Enter seek mode when Shift is first pressed
+    if ((e.key === 'Shift') && !isSeekMode) {
+        isSeekMode = true;
+        showSeekModeIndicator();
+        // If a direction is already held, switch the running interval to seek speed
+        if (seekDirection !== 0) {
+            clearInterval(seekStepInterval);
+            seekStepInterval = setInterval(() => {
+                videoPlayer.currentTime = Math.max(0, Math.min(videoPlayer.duration,
+                    videoPlayer.currentTime + seekDirection * SEEK_PHASES[seekPhaseIndex].step));
+                playSfx('cursor');
+            }, SEEK_INTERVAL_MS);
+            showNavArrow(seekDirection === -1 ? 'left' : 'right');
+        }
+        return;
+    }
+
+    // ── Global shortcuts (work everywhere) ───────────────────────────────
+    if (e.key === ' ' && !e.repeat) {
+        e.preventDefault();
+        if (isPreviewing) { playSfx('back'); stopPreview(); }
+        else if (spriteSheetFrames.length > 0) { playSfx('select'); startPreview(); }
+        return;
+    }
+    if (e.key === 'Backspace' && !e.repeat) {
+        e.preventDefault();
+        if (spriteSheetFrames.length > 0) {
+            if (isPreviewing) stopPreview();
+            playSfx('back');
+            spriteSheetFrames = [];
+            impactFrameIndex = -1;
+            rangeStartTime = null;
+            rangeStartIndex = null;
+            clearTimeout(upHoldTimer);
+            upHoldTimer = null;
+            hideRangeModeIndicator();
+            rebuildSpriteGrid();
+            updateUI();
+        }
+        return;
+    }
+    if (e.key === 'Escape' && !e.repeat) {
+        e.preventDefault();
+        resetSpriteBtn.click();
+        return;
+    }
+    if (e.key === 'Enter' && !e.repeat) {
+        e.preventDefault();
+        if (e.shiftKey) {
+            if (!exportIndividualBtn.disabled) exportIndividualBtn.click();
+        } else {
+            if (!generateSpriteBtn.disabled) generateSpriteBtn.click();
+        }
+        return;
+    }
+
     if (isPreviewing) {
-        // FPS Controls during preview
-        if (e.key === 'ArrowLeft') {
+        // FPS Controls during preview — arrows + QD
+        const isLeft  = e.key === 'ArrowLeft'  || e.key === 'q' || e.key === 'Q';
+        const isRight = e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D';
+        if (isLeft) {
             e.preventDefault();
             currentPreviewFps = Math.max(1, currentPreviewFps - 1);
             playSfx('cursor');
@@ -290,7 +431,7 @@ document.addEventListener('keydown', (e) => {
             runAnimationLoop();
             showNavArrow('left');
         }
-        if (e.key === 'ArrowRight') {
+        if (isRight) {
             e.preventDefault();
             currentPreviewFps = Math.min(60, currentPreviewFps + 1);
             playSfx('cursor');
@@ -300,57 +441,193 @@ document.addEventListener('keydown', (e) => {
         }
         return;
     }
-    
-    // Video controls
-    if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        videoPlayer.currentTime = Math.max(0, videoPlayer.currentTime - VIDEO_NAV_STEP);
-        playSfx('cursor');
-        showNavArrow('left');
-    }
-    if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        videoPlayer.currentTime = Math.min(videoPlayer.duration, videoPlayer.currentTime + VIDEO_NAV_STEP);
-        playSfx('cursor');
-        showNavArrow('right');
-    }
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter') {
-        e.preventDefault();
-        
-        // ArrowDown starts/ends range capture
-        if (e.key === 'ArrowDown') {
-            if (rangeStartTime === null) {
-                // Start range capture
-                rangeStartTime = videoPlayer.currentTime;
-                rangeStartIndex = spriteSheetFrames.length;
-                playSfx('select');
-                captureCurrentFrame();
-                showRangeModeIndicator();
-            } else {
-                // End range capture - capture all frames in between
-                const endTime = videoPlayer.currentTime;
-                const startTime = rangeStartTime;
-                playSfx('select');
-                
-                if (endTime > startTime) {
-                    captureRangeFrames(startTime, endTime);
-                } else {
-                    // If went backwards, just capture current frame
-                    captureCurrentFrame();
-                }
-                
-                // Reset range mode
-                rangeStartTime = null;
-                rangeStartIndex = null;
-                setTimeout(() => hideRangeModeIndicator(), 300);
+
+    const isLeft  = e.key === 'ArrowLeft'  || e.key === 'q' || e.key === 'Q';
+    const isRight = e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D';
+    const isUp    = e.key === 'ArrowUp'    || e.key === 'z' || e.key === 'Z'
+                 || e.key === 'w' || e.key === 'W';
+    const isDown  = e.key === 'ArrowDown'  || e.key === 's' || e.key === 'S';
+
+    // ── Seek mode (Shift held) ────────────────────────────────────────────
+    if (isSeekMode) {
+        if (isLeft || isRight) {
+            e.preventDefault();
+            if (e.repeat) return; // interval handles movement, ignore repeats
+            const dir = isLeft ? -1 : 1;
+            seekDirection = dir;
+            // step once immediately, then start interval
+            videoPlayer.currentTime = Math.max(0, Math.min(videoPlayer.duration,
+                videoPlayer.currentTime + dir * SEEK_PHASES[seekPhaseIndex].step));
+            showNavArrow(dir === -1 ? 'left' : 'right');
+            if (!seekStepInterval) {
+                seekStepInterval = setInterval(() => {
+                    videoPlayer.currentTime = Math.max(0, Math.min(videoPlayer.duration,
+                        videoPlayer.currentTime + seekDirection * SEEK_PHASES[seekPhaseIndex].step));
+                    playSfx('cursor');
+                }, SEEK_INTERVAL_MS);
             }
-        } else {
-            // ArrowUp or Enter - single frame capture (old behavior)
+        }
+        // Up = faster phase, Down = slower phase (arrows AND Z/W/S)
+        if (isUp && !e.repeat) {
+            e.preventDefault();
+            if (seekPhaseIndex < SEEK_PHASES.length - 1) {
+                seekPhaseIndex++;
+                playSfx('cursor');
+                showSeekModeIndicator();
+            }
+        }
+        if (isDown && !e.repeat) {
+            e.preventDefault();
+            if (seekPhaseIndex > 0) {
+                seekPhaseIndex--;
+                playSfx('cursor');
+                showSeekModeIndicator();
+            }
+        }
+        return;
+    }
+
+    // ── Normal mode ───────────────────────────────────────────────────────
+    if (isLeft) {
+        e.preventDefault();
+        if (!e.repeat) {
+            clearInterval(seekStepInterval);
+            seekStepInterval = null;
+            document.getElementById('navArrowRight').classList.remove('show');
+            videoPlayer.currentTime = Math.max(0, videoPlayer.currentTime - VIDEO_NAV_STEP);
+            playSfx('cursor');
+            showNavArrow('left');
+            seekDirection = -1;
+            seekStepInterval = setInterval(() => {
+                videoPlayer.currentTime = Math.max(0, videoPlayer.currentTime - VIDEO_NAV_STEP);
+                playSfx('cursor');
+                showNavArrow('left');
+            }, SEEK_INTERVAL_MS);
+        }
+    }
+    if (isRight) {
+        e.preventDefault();
+        if (!e.repeat) {
+            clearInterval(seekStepInterval);
+            seekStepInterval = null;
+            document.getElementById('navArrowLeft').classList.remove('show');
+            videoPlayer.currentTime = Math.min(videoPlayer.duration, videoPlayer.currentTime + VIDEO_NAV_STEP);
+            playSfx('cursor');
+            showNavArrow('right');
+            seekDirection = 1;
+            seekStepInterval = setInterval(() => {
+                videoPlayer.currentTime = Math.min(videoPlayer.duration, videoPlayer.currentTime + VIDEO_NAV_STEP);
+                playSfx('cursor');
+                showNavArrow('right');
+            }, SEEK_INTERVAL_MS);
+        }
+    }
+    if (isDown && !e.repeat) {
+        e.preventDefault();
+        // Delete the most recent frame
+        if (spriteSheetFrames.length > 0) {
+            const idx = spriteSheetFrames.length - 1;
+            spriteSheetFrames.splice(idx, 1);
+            if (impactFrameIndex === idx) impactFrameIndex = -1;
+            else if (impactFrameIndex > idx) impactFrameIndex--;
+            playSfx('back');
+            rebuildSpriteGrid();
+            updateUI();
+        }
+    }
+    if (isUp && !e.repeat) {
+        e.preventDefault();
+        // Tap: capture one frame immediately
+        playSfx('select');
+        captureCurrentFrame();
+        // Start hold timer for range mode
+        upHoldTimer = setTimeout(() => {
+            upHoldTimer = null;
+            // Enter range mode: the frame we just captured is frame 0 of the range
+            rangeStartTime = videoPlayer.currentTime;
+            rangeStartIndex = spriteSheetFrames.length - 1;
+            showRangeModeIndicator();
+        }, UP_HOLD_DELAY);
+    }
+});
+
+document.addEventListener('keyup', (e) => {
+    // Up released — cancel hold timer or commit range if active
+    if (!isPreviewing && (e.key === 'ArrowUp' || e.key === 'z' || e.key === 'Z'
+                       || e.key === 'w' || e.key === 'W')) {
+        if (upHoldTimer !== null) {
+            // Released before range mode kicked in — just the tap capture, nothing else
+            clearTimeout(upHoldTimer);
+            upHoldTimer = null;
+        } else if (rangeStartTime !== null) {
+            // Released after range mode was active — capture the range
+            const endTime = videoPlayer.currentTime;
+            const startTime = rangeStartTime;
             playSfx('select');
-            captureCurrentFrame();
+            if (endTime > startTime) {
+                captureRangeFrames(startTime, endTime);
+            }
+            rangeStartTime = null;
+            rangeStartIndex = null;
+            setTimeout(() => hideRangeModeIndicator(), 300);
+        }
+    }
+
+    // Exit seek mode when Shift is released
+    if (e.key === 'Shift' && isSeekMode) {
+        isSeekMode = false;
+        clearInterval(seekStepInterval);
+        seekStepInterval = null;
+        seekDirection = 0;
+        hideSeekModeIndicator();
+        document.getElementById('navArrowLeft').classList.remove('seek-hold');
+        document.getElementById('navArrowRight').classList.remove('seek-hold');
+        return;
+    }
+
+    // Stop interval when directional key is released (both normal and seek mode)
+    if (isSeekMode) {
+        const isLeft  = e.key === 'ArrowLeft'  || e.key === 'q' || e.key === 'Q';
+        const isRight = e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D';
+        if (isLeft || isRight) {
+            clearInterval(seekStepInterval);
+            seekStepInterval = null;
+            seekDirection = 0;
+            document.getElementById('navArrowLeft').classList.remove('seek-hold');
+            document.getElementById('navArrowRight').classList.remove('seek-hold');
+        }
+    } else {
+        const isLeft  = e.key === 'ArrowLeft'  || e.key === 'q' || e.key === 'Q';
+        const isRight = e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D';
+        if (isLeft || isRight) {
+            clearInterval(seekStepInterval);
+            seekStepInterval = null;
+            seekDirection = 0;
         }
     }
 });
+
+function showSeekModeIndicator() {
+    if (!seekModeIndicator) {
+        seekModeIndicator = document.createElement('div');
+        seekModeIndicator.className = 'seek-mode-indicator';
+        document.body.appendChild(seekModeIndicator);
+    }
+    const label = SEEK_PHASES[seekPhaseIndex]?.label ?? '';
+    seekModeIndicator.textContent = `⏩ SEEK — ${label}`;
+    seekModeIndicator.style.display = 'block';
+    seekModeIndicator.style.animation = 'none';
+}
+
+function hideSeekModeIndicator() {
+    if (seekModeIndicator) {
+        seekModeIndicator.style.animation = 'fadeOut 0.2s ease-out';
+        setTimeout(() => {
+            if (seekModeIndicator) seekModeIndicator.style.display = 'none';
+            if (seekModeIndicator) seekModeIndicator.style.animation = '';
+        }, 200);
+    }
+}
 
 function captureCurrentFrame() {
     const canvas = document.createElement('canvas');
@@ -464,7 +741,7 @@ function rebuildSpriteGrid() {
         // Delete button
         const del = document.createElement('div');
         del.className = 'delete-btn'; 
-        del.innerHTML = '&times;';
+        del.textContent = '✕';
         del.title = 'Delete frame';
         del.onclick = (e) => {
             e.stopPropagation();
@@ -520,12 +797,14 @@ function updateUI() {
     const isSingle = spriteSheetFrames.length === 1;
     generateSpriteBtn.disabled = !hasFrames;
     previewBtn.disabled = !hasFrames;
+    clearFramesBtn.disabled = !hasFrames;
+    exportIndividualBtn.disabled = !hasFrames;
     
     // Update generate button label
     if (isSingle) {
         generateSpriteBtn.innerHTML = '<span class="btn-icon">↓</span> Save Screenshot';
     } else {
-        generateSpriteBtn.innerHTML = '<span class="btn-icon">↓</span> Generate PNG';
+        generateSpriteBtn.innerHTML = '<span class="btn-icon">↓</span> Generate Sheet';
     }
     
     // Update frame counter with animation
@@ -550,6 +829,10 @@ function updateUI() {
 function resetInternalState() {
     spriteSheetFrames = []; 
     impactFrameIndex = -1;
+    rangeStartTime = null;
+    rangeStartIndex = null;
+    clearTimeout(upHoldTimer);
+    upHoldTimer = null;
     stopPreview(); 
     rebuildSpriteGrid(); 
     updateUI();

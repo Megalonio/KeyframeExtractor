@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Keyframe Extractor</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
     <div id="loadingOverlay">
@@ -31,16 +32,48 @@
         <!-- Navigation Arrow Indicators -->
         <div class="nav-arrow left" id="navArrowLeft">
             <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M50 20L30 40L50 60" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+                <path class="arrow-single" d="M50 20L30 40L50 60" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+                <path class="arrow-double" d="M58 20L38 40L58 60" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+                <path class="arrow-double" d="M40 20L20 40L40 60" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
         </div>
         <div class="nav-arrow right" id="navArrowRight">
             <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M30 20L50 40L30 60" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+                <path class="arrow-single" d="M30 20L50 40L30 60" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+                <path class="arrow-double" d="M22 20L42 40L22 60" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+                <path class="arrow-double" d="M40 20L60 40L40 60" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
         </div>
         
-        <div class="main-layout">
+            <!-- SIDE CONTROLS PANEL -->
+            <div class="side-controls">
+                <div class="side-controls-title">Controls</div>
+                <div class="side-controls-section">
+                    <div class="side-ctrl-label">Navigate</div>
+                    <div class="side-ctrl-row"><span class="hint-key">←</span><span class="hint-key">→</span> <span>Frame step</span></div>
+                    <div class="side-ctrl-row"><span class="hint-key">Shift</span> + <span class="hint-key">←</span><span class="hint-key">→</span> <span>Seek mode</span></div>
+                    <div class="side-ctrl-row"><span class="hint-key">↑</span><span class="hint-key">↓</span> <span>Seek speed</span></div>
+                </div>
+                <div class="side-controls-section">
+                    <div class="side-ctrl-label">Capture</div>
+                    <div class="side-ctrl-row"><span class="hint-key">↑</span> <span>Capture frame</span></div>
+                    <div class="side-ctrl-row">Hold <span class="hint-key">↑</span> <span>Range mode</span></div>
+                    <div class="side-ctrl-row"><span class="hint-key">↓</span> <span>Delete last</span></div>
+                </div>
+                <div class="side-controls-section">
+                    <div class="side-ctrl-label">Export</div>
+                    <div class="side-ctrl-row"><span class="hint-key">Enter</span> <span>Sheet / Screenshot</span></div>
+                    <div class="side-ctrl-row"><span class="hint-key">⇧ Enter</span> <span>Individuals ZIP</span></div>
+                </div>
+                <div class="side-controls-section">
+                    <div class="side-ctrl-label">Other</div>
+                    <div class="side-ctrl-row"><span class="hint-key">Space</span> <span>Preview</span></div>
+                    <div class="side-ctrl-row"><span class="hint-key">⌫</span> <span>Clear timeline</span></div>
+                    <div class="side-ctrl-row"><span class="hint-key">Esc</span> <span>Reset</span></div>
+                </div>
+            </div>
+
+            <div class="main-layout">
             <!-- TOP AREA (75%) -->
             <div class="video-area">
                 <div class="video-wrapper">
@@ -48,11 +81,11 @@
                     <canvas id="animationPreview" style="display: none;"></canvas>
                     
                     <div class="nav-hint" id="navHint">
-                        <span class="hint-key">←</span> <span class="hint-key">→</span> to Seek 
-                        <span class="hint-separator">•</span> 
-                        <span class="hint-key">↑</span> or <span class="hint-key">Enter</span> to Capture
+                        <span class="hint-key">←</span> <span class="hint-key">→</span> to Seek
                         <span class="hint-separator">•</span>
-                        <span class="hint-key">↓</span> twice for Range
+                        <span class="hint-key">↑</span> to Capture
+                        <span class="hint-separator">•</span>
+                        Hold <span class="hint-key">↑</span> for Range
                     </div>
                     <div class="nav-hint" id="previewHint" style="display: none;">
                         <span style="color: var(--accent-pink); font-weight: bold;">◉ PREVIEW MODE</span><br>
@@ -75,11 +108,17 @@
                         <button id="resetSpriteBtn" class="btn-secondary" title="Clear all frames">
                             <span class="btn-icon">↺</span> Reset
                         </button>
+                        <button id="clearFramesBtn" class="btn-secondary" disabled title="Remove all frames from grid">
+                            <span class="btn-icon">✕</span> Clear
+                        </button>
                         <button id="previewBtn" class="btn-secondary" disabled title="Preview animation loop">
                             <span class="btn-icon">▶</span> Preview Animation
                         </button>
+                        <button id="exportIndividualBtn" class="btn-secondary" disabled title="Export each frame as a separate PNG in a ZIP">
+                            <span class="btn-icon">⊞</span> Export Individual
+                        </button>
                         <button id="generateSpriteBtn" class="btn-primary" disabled title="Export sprite sheet as PNG">
-                            <span class="btn-icon">↓</span> Generate PNG
+                            <span class="btn-icon">↓</span> Generate Sheet
                         </button>
                     </div>
                 </div>
