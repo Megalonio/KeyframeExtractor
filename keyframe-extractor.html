@@ -5,9 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Keyframe Extractor</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="hub.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="hub-audio.js"></script>
+    <style>
+        /* Offset for hub nav (~55px tall) */
+        #videoSection,
+        .main-layout {
+            height: calc(100vh - 55px) !important;
+        }
+        .seek-mode-indicator {
+            top: 75px !important;
+        }
+    </style>
 </head>
 <body>
+    <nav class="hub-nav">
+        <a class="hub-nav-brand" href="index.html">
+            <span class="hub-nav-brand-diamond"></span>
+            Dev Hub
+        </a>
+        <div class="hub-nav-title">▶ Keyframe Extractor</div>
+    </nav>
+
     <div id="loadingOverlay">
         <div class="loading-spinner"></div>
         <div class="loading-text">INITIALIZING</div>
