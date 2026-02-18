@@ -1,1 +1,1 @@
-https://megalonio.github.io/KeyframeExtractor/
+https://megalonio.github.io/MegaHub/
