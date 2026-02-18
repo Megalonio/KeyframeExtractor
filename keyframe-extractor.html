@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keyframe Extractor</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+    <div id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">INITIALIZING</div>
+        <div class="loading-subtext">Preparing video stream...</div>
+    </div>
+
+    <div class="container" id="uploadContainer">
+        <div class="upload-zone" id="uploadZone">
+            <div class="upload-icon">
+                <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M40 10L40 50M40 10L25 25M40 10L55 25" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M15 45V65C15 67.7614 17.2386 70 20 70H60C62.7614 70 65 67.7614 65 65V45" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <div class="upload-text">Drop Video Here</div>
+            <div class="upload-hint">or click to browse • MP4, MOV, WebM</div>
+            <input type="file" id="videoInput" accept="video/*">
+        </div>
+    </div>
+
+    <div id="videoSection">
+        <!-- Navigation Arrow Indicators -->
+        <div class="nav-arrow left" id="navArrowLeft">
+            <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path class="arrow-single" d="M50 20L30 40L50 60" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+                <path class="arrow-double" d="M58 20L38 40L58 60" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+                <path class="arrow-double" d="M40 20L20 40L40 60" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <div class="nav-arrow right" id="navArrowRight">
+            <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path class="arrow-single" d="M30 20L50 40L30 60" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+                <path class="arrow-double" d="M22 20L42 40L22 60" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+                <path class="arrow-double" d="M40 20L60 40L40 60" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        
+        <!-- SIDE CONTROLS PANEL -->
+        <div class="side-controls">
+            <div class="side-controls-title">Controls</div>
+            <div class="side-controls-section">
+                <div class="side-ctrl-label">Navigate</div>
+                <div class="side-ctrl-row"><span class="hint-key">←</span><span class="hint-key">→</span> <span>Frame step</span></div>
+                <div class="side-ctrl-row"><span class="hint-key">Shift</span> + <span class="hint-key">←</span><span class="hint-key">→</span> <span>Seek mode</span></div>
+                <div class="side-ctrl-row"><span class="hint-key">↑</span><span class="hint-key">↓</span> <span>Seek speed</span></div>
+            </div>
+            <div class="side-controls-section">
+                <div class="side-ctrl-label">Capture</div>
+                <div class="side-ctrl-row"><span class="hint-key">↑</span> <span>Capture frame</span></div>
+                <div class="side-ctrl-row">Hold <span class="hint-key">↑</span> <span>Range mode</span></div>
+                <div class="side-ctrl-row"><span class="hint-key">↓</span> <span>Delete last</span></div>
+            </div>
+            <div class="side-controls-section">
+                <div class="side-ctrl-label">Export</div>
+                <div class="side-ctrl-row"><span class="hint-key">Enter</span> <span>Sheet / Screenshot</span></div>
+                <div class="side-ctrl-row"><span class="hint-key">⇧ Enter</span> <span>Individuals ZIP</span></div>
+            </div>
+            <div class="side-controls-section">
+                <div class="side-ctrl-label">Other</div>
+                <div class="side-ctrl-row"><span class="hint-key">Space</span> <span>Preview</span></div>
+                <div class="side-ctrl-row"><span class="hint-key">⌫</span> <span>Clear timeline</span></div>
+                <div class="side-ctrl-row"><span class="hint-key">Esc</span> <span>Reset</span></div>
+            </div>
+        </div>
+
+        <div class="main-layout">
+            <!-- TOP AREA (75%) -->
+            <div class="video-area">
+                <div class="video-wrapper">
+                    <video id="videoPlayer" controls muted></video>
+                    <canvas id="animationPreview"></canvas>
+                    
+                    <div class="nav-hint" id="navHint">
+                        <span class="hint-key">←</span> <span class="hint-key">→</span> to Seek
+                        <span class="hint-separator">•</span>
+                        <span class="hint-key">↑</span> to Capture
+                        <span class="hint-separator">•</span>
+                        Hold <span class="hint-key">↑</span> for Range
+                    </div>
+                    <div class="nav-hint preview-hint" id="previewHint">
+                        <span class="preview-hint-label">◉ PREVIEW MODE</span><br>
+                        <span id="fpsDisplay">12 FPS</span><br>
+                        <span class="preview-hint-sub">Use <span class="hint-key">←</span> <span class="hint-key">→</span> to change speed</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- BOTTOM AREA (25%) -->
+            <div class="sprite-builder-area">
+                <div class="sprite-header">
+                    <div class="title-group">
+                        <h2 class="panel-title">
+                            <span class="title-icon">▶</span> Sprite Builder
+                        </h2>
+                        <span id="frameCounter" class="frame-badge">0 frames</span>
+                    </div>
+                    <div class="sprite-actions">
+                        <button id="resetSpriteBtn" class="btn-secondary" title="Clear all frames">
+                            <span class="btn-icon">↺</span> Reset
+                        </button>
+                        <button id="clearFramesBtn" class="btn-secondary" disabled title="Remove all frames from grid">
+                            <span class="btn-icon">✕</span> Clear
+                        </button>
+                        <button id="previewBtn" class="btn-secondary" disabled title="Preview animation loop">
+                            <span class="btn-icon">▶</span> Preview Animation
+                        </button>
+                        <button id="exportIndividualBtn" class="btn-secondary" disabled title="Export each frame as a separate PNG in a ZIP">
+                            <span class="btn-icon">⊞</span> Export Individual
+                        </button>
+                        <button id="generateSpriteBtn" class="btn-primary" disabled title="Export sprite sheet as PNG">
+                            <span class="btn-icon">↓</span> Generate Sheet
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="sprite-grid-container">
+                    <div class="sprite-grid" id="spriteGrid">
+                        <div class="empty-state">
+                            <div class="empty-icon">◇</div>
+                            <div class="empty-text">No frames yet</div>
+                            <div class="empty-hint">Capture frames from the video above</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
