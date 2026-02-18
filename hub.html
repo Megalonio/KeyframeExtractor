@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dev Hub</title>
+    <link rel="stylesheet" href="hub.css">
+    <script src="hub-audio.js"></script>
+    <style>
+        body { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+        .hub-header { position: relative; z-index: 10; display: flex; align-items: center; justify-content: space-between; padding: 16px 40px; flex-shrink: 0; animation: fadeInDown 0.45s ease-out both; }
+        .hub-wordmark { display: flex; flex-direction: column; gap: 2px; }
+        .hub-wordmark-top { font-family: 'Syne', sans-serif; font-size: 0.6rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 6px; }
+        .hub-wordmark-main { font-family: 'Syne', sans-serif; font-size: 1.5rem; font-weight: 800; color: var(--accent-cyan); text-transform: uppercase; letter-spacing: 4px; text-shadow: 0 0 30px rgba(0,255,255,0.35); display: flex; align-items: center; gap: 14px; }
+        .hub-diamond { width: 12px; height: 12px; background: var(--accent-cyan); transform: rotate(45deg); box-shadow: 0 0 12px var(--accent-cyan); animation: pulse 2s ease-in-out infinite; flex-shrink: 0; }
+        .hub-count { font-size: 0.65rem; color: var(--text-muted); letter-spacing: 2px; align-self: flex-end; padding-bottom: 2px; }
+
+        /* 5-column grid */
+        .tools-grid { flex: 1; display: grid; grid-template-columns: repeat(6, 1fr); min-height: 0; position: relative; z-index: 2; }
+
+        /* dividers */
+        .tools-grid::before { content: ''; position: absolute; top: 0; bottom: 0; left: 0; right: 0; background:
+            repeating-linear-gradient(90deg, transparent, transparent calc(16.666% - 1px), var(--border) calc(16.666% - 1px), var(--border) 16.666%);
+            pointer-events: none; opacity: 0.6; }
+
+        .tool-card { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 28px 20px; text-decoration: none; overflow: hidden; transition: background 0.3s ease; border-top: 1px solid var(--border); animation: cardIn 0.55s ease-out both; }
+        .tool-card:nth-child(1) { animation-delay: 0.00s; }
+        .tool-card:nth-child(2) { animation-delay: 0.06s; }
+        .tool-card:nth-child(3) { animation-delay: 0.12s; }
+        .tool-card:nth-child(4) { animation-delay: 0.18s; }
+        .tool-card:nth-child(5) { animation-delay: 0.24s; }
+        .tool-card:nth-child(6) { animation-delay: 0.30s; }
+        @keyframes cardIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        .tool-card::before { content: ''; position: absolute; width: 400px; height: 400px; border-radius: 50%; opacity: 0; transition: opacity 0.5s ease, transform 0.5s ease; pointer-events: none; top: 50%; left: 50%; transform: translate(-50%,-50%) scale(0.4); }
+        .tool-card:nth-child(odd)::before  { background: radial-gradient(circle, rgba(0,255,255,0.07) 0%, transparent 70%); }
+        .tool-card:nth-child(even)::before { background: radial-gradient(circle, rgba(255,0,255,0.07) 0%, transparent 70%); }
+        .tool-card:hover::before { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+        .tool-card:hover { background: rgba(255,255,255,0.012); }
+
+        .tool-card .corner { position: absolute; width: 16px; height: 16px; opacity: 0; transition: opacity 0.25s ease; }
+        .tool-card:hover .corner { opacity: 1; }
+        .corner.tl { top: 14px; left: 14px; border-top: 2px solid; border-left: 2px solid; }
+        .corner.tr { top: 14px; right: 14px; border-top: 2px solid; border-right: 2px solid; }
+        .corner.bl { bottom: 14px; left: 14px; border-bottom: 2px solid; border-left: 2px solid; }
+        .corner.br { bottom: 14px; right: 14px; border-bottom: 2px solid; border-right: 2px solid; }
+        .tool-card:nth-child(odd)  .corner { border-color: var(--accent-cyan); }
+        .tool-card:nth-child(even) .corner { border-color: var(--accent-pink); }
+
+        /* keyboard focus highlight — no outline, just the card's own hover glow */
+        .tool-card.kb-focus { background: rgba(255,255,255,0.012); }
+        .tool-card.kb-focus .corner { opacity: 1; }
+        .tool-card:nth-child(odd).kb-focus  .tool-icon { border-color: var(--accent-cyan); box-shadow: 0 0 32px rgba(0,255,255,0.28); transform: translateY(-4px); }
+        .tool-card:nth-child(even).kb-focus .tool-icon { border-color: var(--accent-pink); box-shadow: 0 0 32px rgba(255,0,255,0.28); transform: translateY(-4px); }
+        .tool-card:nth-child(odd).kb-focus  .tool-name { color: var(--accent-cyan); }
+        .tool-card:nth-child(even).kb-focus .tool-name { color: var(--accent-pink); }
+        .tool-card:nth-child(odd).kb-focus  .tool-launch { border-color: var(--accent-cyan); color: var(--accent-cyan); background: rgba(0,255,255,0.04); }
+        .tool-card:nth-child(even).kb-focus .tool-launch { border-color: var(--accent-pink); color: var(--accent-pink); background: rgba(255,0,255,0.04); }
+        .tool-card.kb-focus .tool-launch-arrow { transform: translateX(4px); }
+        .tool-card:nth-child(odd).kb-focus  .tool-icon-ring { border-color: rgba(0,255,255,0.18); }
+        .tool-card:nth-child(even).kb-focus .tool-icon-ring { border-color: rgba(255,0,255,0.18); }
+
+        .tool-icon-wrap { position: relative; }
+        .tool-icon { width: 76px; height: 76px; border: 2px solid var(--border); border-radius: 12px; background: var(--surface); display: flex; align-items: center; justify-content: center; transition: all 0.3s ease; position: relative; z-index: 1; }
+        .tool-icon svg { width: 36px; height: 36px; transition: color 0.3s ease, transform 0.3s ease; }
+        .tool-card:nth-child(odd)  .tool-icon svg { color: var(--accent-cyan); }
+        .tool-card:nth-child(even) .tool-icon svg { color: var(--accent-pink); }
+        .tool-card:nth-child(odd):hover  .tool-icon { border-color: var(--accent-cyan); box-shadow: 0 0 32px rgba(0,255,255,0.28); transform: translateY(-4px); }
+        .tool-card:nth-child(even):hover .tool-icon { border-color: var(--accent-pink); box-shadow: 0 0 32px rgba(255,0,255,0.28); transform: translateY(-4px); }
+        .tool-card:hover .tool-icon svg { transform: scale(1.1); }
+        .tool-icon-ring { position: absolute; inset: -7px; border-radius: 18px; border: 1px solid transparent; transition: border-color 0.3s ease; }
+        .tool-card:nth-child(odd):hover  .tool-icon-ring { border-color: rgba(0,255,255,0.18); }
+        .tool-card:nth-child(even):hover .tool-icon-ring { border-color: rgba(255,0,255,0.18); }
+
+        .tool-info { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .tool-tag { font-size: 0.52rem; font-weight: 700; text-transform: uppercase; letter-spacing: 3px; opacity: 0.65; }
+        .tool-card:nth-child(odd)  .tool-tag { color: var(--accent-cyan); }
+        .tool-card:nth-child(even) .tool-tag { color: var(--accent-pink); }
+        .tool-name { font-family: 'Syne', sans-serif; font-size: clamp(1rem, 1.6vw, 1.5rem); font-weight: 800; color: var(--text-light); text-transform: uppercase; letter-spacing: 2px; line-height: 1.1; transition: color 0.2s ease; }
+        .tool-card:nth-child(odd):hover  .tool-name { color: var(--accent-cyan); }
+        .tool-card:nth-child(even):hover .tool-name { color: var(--accent-pink); }
+        .tool-desc { font-size: 0.68rem; color: var(--text-muted); line-height: 1.7; max-width: 200px; }
+
+        .tool-launch { display: flex; align-items: center; gap: 8px; padding: 8px 18px; border: 2px solid var(--border); border-radius: 6px; background: transparent; color: var(--text-muted); font-family: 'Space Mono', monospace; font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; transition: all 0.25s ease; }
+        .tool-launch-arrow { transition: transform 0.25s ease; }
+        .tool-card:nth-child(odd):hover  .tool-launch { border-color: var(--accent-cyan); color: var(--accent-cyan); background: rgba(0,255,255,0.04); }
+        .tool-card:nth-child(even):hover .tool-launch { border-color: var(--accent-pink); color: var(--accent-pink); background: rgba(255,0,255,0.04); }
+        .tool-card:hover .tool-launch-arrow { transform: translateX(4px); }
+
+        .status-bar { position: relative; z-index: 10; display: flex; align-items: center; justify-content: space-between; padding: 8px 40px; border-top: 1px solid var(--border); flex-shrink: 0; animation: fadeInDown 0.45s ease-out 0.25s both; }
+        .status-bar::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--accent-pink), transparent); opacity: 0.3; }
+        .status-item { font-size: 0.58rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; display: flex; align-items: center; gap: 8px; }
+        .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-cyan); box-shadow: 0 0 6px var(--accent-cyan); animation: pulse 2s ease-in-out infinite; }
+    </style>
+</head>
+<body>
+    <header class="hub-header">
+        <div class="hub-wordmark">
+            <div class="hub-wordmark-top">Personal Toolbox</div>
+            <div class="hub-wordmark-main"><span class="hub-diamond"></span>Dev Hub</div>
+        </div>
+        <div class="hub-count">6 tools available</div>
+    </header>
+
+    <div class="tools-grid">
+
+        <a class="tool-card" href="index.html">
+            <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+            <div class="tool-icon-wrap">
+                <div class="tool-icon">
+                    <svg viewBox="0 0 48 48" fill="none">
+                        <rect x="6" y="10" width="36" height="26" rx="3" stroke="currentColor" stroke-width="2.5"/>
+                        <path d="M19 18L30 24L19 30V18Z" fill="currentColor"/>
+                        <line x1="6" y1="40" x2="42" y2="40" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <rect x="10" y="42" width="6" height="3" rx="1" fill="currentColor" opacity="0.5"/>
+                        <rect x="21" y="42" width="6" height="3" rx="1" fill="currentColor" opacity="0.5"/>
+                        <rect x="32" y="42" width="6" height="3" rx="1" fill="currentColor" opacity="0.5"/>
+                    </svg>
+                </div>
+                <div class="tool-icon-ring"></div>
+            </div>
+            <div class="tool-info">
+                <div class="tool-tag">⬡ Video</div>
+                <div class="tool-name">Keyframe<br>Extractor</div>
+                <div class="tool-desc">Step through video, capture frames, export as sprite sheet or PNGs.</div>
+            </div>
+            <div class="tool-launch">Open <span class="tool-launch-arrow">→</span></div>
+        </a>
+
+        <a class="tool-card" href="tapbpm.html">
+            <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+            <div class="tool-icon-wrap">
+                <div class="tool-icon">
+                    <svg viewBox="0 0 48 48" fill="none">
+                        <circle cx="24" cy="24" r="16" stroke="currentColor" stroke-width="2.5"/>
+                        <circle cx="24" cy="24" r="4" fill="currentColor"/>
+                        <line x1="24" y1="8"  x2="24" y2="14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                        <line x1="24" y1="34" x2="24" y2="40" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                        <line x1="8"  y1="24" x2="14" y2="24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                        <line x1="34" y1="24" x2="40" y2="24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                        <path d="M24 24L31 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <div class="tool-icon-ring"></div>
+            </div>
+            <div class="tool-info">
+                <div class="tool-tag">◈ Audio</div>
+                <div class="tool-name">Tap<br>BPM</div>
+                <div class="tool-desc">Tap any beat, get a rolling BPM reading with confidence tracking.</div>
+            </div>
+            <div class="tool-launch">Open <span class="tool-launch-arrow">→</span></div>
+        </a>
+
+        <a class="tool-card" href="spritebuilder.html">
+            <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+            <div class="tool-icon-wrap">
+                <div class="tool-icon">
+                    <svg viewBox="0 0 48 48" fill="none">
+                        <rect x="4"  y="4"  width="18" height="18" rx="3" stroke="currentColor" stroke-width="2.5"/>
+                        <rect x="26" y="4"  width="18" height="18" rx="3" stroke="currentColor" stroke-width="2.5"/>
+                        <rect x="4"  y="26" width="18" height="18" rx="3" stroke="currentColor" stroke-width="2.5"/>
+                        <rect x="26" y="26" width="18" height="18" rx="3" stroke="currentColor" stroke-width="2.5" opacity="0.4"/>
+                        <path d="M35 31V39M31 35H39" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <div class="tool-icon-ring"></div>
+            </div>
+            <div class="tool-info">
+                <div class="tool-tag">⊞ Image</div>
+                <div class="tool-name">Sprite<br>Builder</div>
+                <div class="tool-desc">Drag images in, reorder freely, export as a sprite sheet.</div>
+            </div>
+            <div class="tool-launch">Open <span class="tool-launch-arrow">→</span></div>
+        </a>
+
+        <a class="tool-card" href="onionskin.html">
+            <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+            <div class="tool-icon-wrap">
+                <div class="tool-icon">
+                    <svg viewBox="0 0 48 48" fill="none">
+                        <rect x="8"  y="12" width="28" height="28" rx="3" stroke="currentColor" stroke-width="2.5" opacity="0.3"/>
+                        <rect x="14" y="8"  width="28" height="28" rx="3" stroke="currentColor" stroke-width="2.5" opacity="0.6"/>
+                        <rect x="20" y="4"  width="28" height="28" rx="3" stroke="currentColor" stroke-width="2.5"/>
+                        <path d="M27 16L37 22L27 28V16Z" fill="currentColor" opacity="0.5"/>
+                    </svg>
+                </div>
+                <div class="tool-icon-ring"></div>
+            </div>
+            <div class="tool-info">
+                <div class="tool-tag">◎ Animation</div>
+                <div class="tool-name">Onionskin<br>Aligner</div>
+                <div class="tool-desc">Align frames pixel-by-pixel with onionskin ghosting. Export as sheet.</div>
+            </div>
+            <div class="tool-launch">Open <span class="tool-launch-arrow">→</span></div>
+        </a>
+
+        <a class="tool-card" href="sheetslicer.html">
+            <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+            <div class="tool-icon-wrap">
+                <div class="tool-icon">
+                    <svg viewBox="0 0 48 48" fill="none">
+                        <rect x="4" y="4" width="40" height="40" rx="3" stroke="currentColor" stroke-width="2.5"/>
+                        <line x1="4"  y1="18" x2="44" y2="18" stroke="currentColor" stroke-width="2" opacity="0.6"/>
+                        <line x1="4"  y1="32" x2="44" y2="32" stroke="currentColor" stroke-width="2" opacity="0.6"/>
+                        <line x1="18" y1="4"  x2="18" y2="44" stroke="currentColor" stroke-width="2" opacity="0.6"/>
+                        <line x1="32" y1="4"  x2="32" y2="44" stroke="currentColor" stroke-width="2" opacity="0.6"/>
+                        <circle cx="18" cy="18" r="3" fill="currentColor"/>
+                        <circle cx="32" cy="18" r="3" fill="currentColor"/>
+                        <circle cx="18" cy="32" r="3" fill="currentColor"/>
+                    </svg>
+                </div>
+                <div class="tool-icon-ring"></div>
+            </div>
+            <div class="tool-info">
+                <div class="tool-tag">✂ Image</div>
+                <div class="tool-name">Sheet<br>Slicer</div>
+                <div class="tool-desc">Import a sprite sheet, define frame size, export individual PNGs as ZIP.</div>
+            </div>
+            <div class="tool-launch">Open <span class="tool-launch-arrow">→</span></div>
+        </a>
+
+        <a class="tool-card" href="ytmp3.html">
+            <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+            <div class="tool-icon-wrap">
+                <div class="tool-icon">
+                    <svg viewBox="0 0 48 48" fill="none">
+                        <circle cx="24" cy="24" r="18" stroke="currentColor" stroke-width="2.5"/>
+                        <path d="M20 17L32 24L20 31V17Z" fill="currentColor"/>
+                        <path d="M8 38h32" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+                        <path d="M14 43h20" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.25"/>
+                    </svg>
+                </div>
+                <div class="tool-icon-ring"></div>
+            </div>
+            <div class="tool-info">
+                <div class="tool-tag">▶ Audio</div>
+                <div class="tool-name">YT<br>→ MP3</div>
+                <div class="tool-desc">Generate a .bat file — run it once to download any YouTube video as MP3.</div>
+            </div>
+            <div class="tool-launch">Open <span class="tool-launch-arrow">→</span></div>
+        </a>
+
+    </div>
+
+    <footer class="status-bar">
+        <div class="status-item"><span class="status-dot"></span>All systems ready</div>
+        <div class="status-item">Personal Dev Hub — v1.3</div>
+    </footer>
+    <script>
+        const cards = Array.from(document.querySelectorAll('.tool-card'));
+        let kbIdx = -1;
+
+        function setKbFocus(idx) {
+            cards.forEach(c => c.classList.remove('kb-focus'));
+            if (idx < 0 || idx >= cards.length) { kbIdx = -1; return; }
+            kbIdx = idx;
+            cards[kbIdx].classList.add('kb-focus');
+        }
+
+        document.addEventListener('keydown', e => {
+            if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                const next = kbIdx < 0 ? 0 : Math.min(kbIdx + 1, cards.length - 1);
+                if (next !== kbIdx) HubAudio.play('cursor');
+                setKbFocus(next);
+            } else if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                const prev = kbIdx < 0 ? cards.length - 1 : Math.max(kbIdx - 1, 0);
+                if (prev !== kbIdx) HubAudio.play('cursor');
+                setKbFocus(prev);
+            } else if ((e.key === 'ArrowUp' || e.key === 'Enter') && kbIdx >= 0) {
+                e.preventDefault();
+                HubAudio.play('select');
+                setTimeout(() => cards[kbIdx].click(), 80);
+            }
+        });
+
+        cards.forEach((card, i) => {
+            card.addEventListener('mouseenter', () => {
+                HubAudio.play('cursor');
+                setKbFocus(i);
+            });
+            card.addEventListener('click', () => HubAudio.play('select'));
+        });
+    </script>
+</body>
+</html>

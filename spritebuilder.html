@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprite Sheet Builder — Hub</title>
+    <link rel="stylesheet" href="hub.css">
+    <script src="hub-audio.js"></script>
+    <style>
+        body {
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── MAIN LAYOUT ── */
+        .tool-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            position: relative;
+            z-index: 2;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        /* ── TOP: DROP ZONE (shown when empty) ── */
+        #dropScreen {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .upload-zone {
+            padding: 60px 100px;
+        }
+
+        /* ── EDITOR (shown once images loaded) ── */
+        #editorScreen {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        /* ── FRAME STRIP (75%) ── */
+        .frames-area {
+            flex: 0 0 75%;
+            min-height: 0;
+            background: rgba(0,0,0,0.4);
+            border-bottom: 2px solid var(--border);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            overflow: hidden;
+        }
+
+        .frames-area::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+            opacity: 0.5;
+        }
+
+        /* Preview canvas of the sheet */
+        #sheetPreview {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            box-shadow: 0 10px 50px rgba(0,0,0,0.5);
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        .frames-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-muted);
+            opacity: 0.4;
+        }
+
+        .frames-empty-icon {
+            font-size: 2.5rem;
+            animation: spinSlow 4s linear infinite;
+        }
+
+        /* ── BOTTOM PANEL (25%) ── */
+        .builder-area {
+            flex: 0 0 25%;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-darker);
+            padding: 14px 20px;
+            min-height: 0;
+            border-top: 1px solid var(--border);
+        }
+
+        /* Header row */
+        .builder-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            flex-shrink: 0;
+        }
+
+        .title-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .panel-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 1rem;
+            font-weight: 800;
+            color: var(--accent-cyan);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .title-icon {
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .frame-badge {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            background: var(--surface);
+            padding: 4px 10px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            transition: all 0.3s ease, transform 0.15s ease;
+        }
+
+        .frame-badge.has-frames {
+            color: var(--accent-cyan);
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 10px rgba(0,255,255,0.2);
+        }
+
+        .frame-badge.pop { transform: scale(1.2); }
+
+        .builder-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        /* Thumbnail strip */
+        .sprite-grid-container {
+            flex: 1;
+            overflow-x: auto;
+            overflow-y: hidden;
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            white-space: nowrap;
+            min-height: 0;
+            scrollbar-width: thin;
+            scrollbar-color: var(--accent-cyan) var(--border);
+            scrollbar-gutter: stable;
+        }
+
+        .sprite-grid-container::-webkit-scrollbar          { height: 8px; }
+        .sprite-grid-container::-webkit-scrollbar-track    { background: var(--surface); border-radius: 4px; margin: 0 10px; }
+        .sprite-grid-container::-webkit-scrollbar-thumb    { background: linear-gradient(90deg, var(--accent-cyan), var(--accent-pink)); border-radius: 4px; }
+
+        .sprite-grid {
+            display: inline-flex;
+            gap: 10px;
+            height: 100%;
+            align-items: center;
+            padding: 10px 12px;
+            min-width: min-content;
+        }
+
+        /* Individual thumbnail slots */
+        .sprite-slot {
+            width: 80px;
+            height: 80px;
+            flex-shrink: 0;
+            border: 2px solid var(--border);
+            background: var(--surface);
+            position: relative;
+            cursor: grab;
+            overflow: hidden;
+            transition: all 0.2s ease;
+            border-radius: 4px;
+            animation: slotAppear 0.25s ease-out backwards;
+        }
+
+        @keyframes slotAppear {
+            from { opacity: 0; transform: scale(0.8) translateY(8px); }
+            to   { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .sprite-slot:hover {
+            border-color: var(--accent-cyan);
+            transform: scale(1.06) translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0,255,255,0.25);
+            z-index: 10;
+        }
+
+        .sprite-slot.dragging {
+            opacity: 0.35;
+            border-color: var(--accent-pink);
+            cursor: grabbing;
+        }
+
+        .sprite-slot.drag-over {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 20px rgba(0,255,255,0.4);
+            transform: scale(1.08);
+        }
+
+        .sprite-slot img {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: cover;
+            pointer-events: none;
+        }
+
+        /* Frame number badge */
+        .sprite-slot-number {
+            position: absolute;
+            bottom: 3px; right: 3px;
+            background: rgba(0,255,255,0.9);
+            color: var(--bg-dark);
+            font-size: 0.6rem;
+            font-weight: bold;
+            padding: 1px 5px;
+            border-radius: 3px;
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        /* Delete button */
+        .delete-btn {
+            position: absolute;
+            top: 3px; right: 3px;
+            width: 18px; height: 18px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 50%;
+            font-size: 10px;
+            z-index: 10;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            transition: all 0.2s ease;
+            opacity: 0;
+            user-select: none;
+        }
+
+        .sprite-slot:hover .delete-btn { opacity: 1; }
+
+        .delete-btn:hover {
+            background: var(--accent-pink);
+            border-color: var(--accent-pink);
+            transform: scale(1.15);
+            box-shadow: 0 0 8px rgba(255,0,255,0.5);
+        }
+
+        /* Add more slot */
+        .add-slot {
+            width: 80px;
+            height: 80px;
+            flex-shrink: 0;
+            border: 2px dashed var(--border);
+            background: transparent;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: var(--text-muted);
+            font-size: 1.4rem;
+            position: relative;
+        }
+
+        .add-slot:hover {
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+            box-shadow: 0 0 15px rgba(0,255,255,0.15);
+            transform: scale(1.04);
+        }
+
+        /* Empty state */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            color: var(--text-muted);
+            opacity: 0.5;
+        }
+
+        .empty-icon {
+            font-size: 1.8rem;
+            margin-bottom: 6px;
+            animation: spinSlow 4s linear infinite;
+        }
+
+        .empty-text { font-size: 0.85rem; font-weight: 700; margin-bottom: 3px; }
+        .empty-hint { font-size: 0.65rem; opacity: 0.7; }
+
+        /* Drop-anywhere overlay while dragging files */
+        #globalDropOverlay {
+            display: none;
+            position: fixed; inset: 0;
+            z-index: 500;
+            background: rgba(0,255,255,0.04);
+            border: 3px solid var(--accent-cyan);
+            pointer-events: none;
+        }
+
+        #globalDropOverlay.active { display: block; }
+
+        /* Loading overlay reuse */
+        #loadingOverlay { display: none; }
+        #loadingOverlay.active { display: flex; }
+    </style>
+</head>
+<body>
+
+    <!-- Hub Nav -->
+    <nav class="hub-nav">
+        <a class="hub-nav-brand" href="hub.html">
+            <span class="hub-nav-brand-diamond"></span>
+            Dev Hub
+        </a>
+        <div class="hub-nav-title">⊞ Sprite Sheet Builder</div>
+    </nav>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">GENERATING</div>
+        <div class="loading-subtext">Building sprite sheet...</div>
+    </div>
+
+    <!-- Global drop overlay (visual feedback when dragging files anywhere) -->
+    <div id="globalDropOverlay"></div>
+
+    <div class="tool-body">
+
+        <!-- DROP SCREEN -->
+        <div id="dropScreen">
+            <div class="upload-zone" id="uploadZone">
+                <div class="upload-icon">
+                    <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+                        <rect x="8"  y="20" width="28" height="28" rx="4" stroke="currentColor" stroke-width="3"/>
+                        <rect x="44" y="20" width="28" height="28" rx="4" stroke="currentColor" stroke-width="3"/>
+                        <rect x="8"  y="56" width="28" height="14" rx="3" stroke="currentColor" stroke-width="3" opacity="0.5"/>
+                        <rect x="44" y="56" width="28" height="14" rx="3" stroke="currentColor" stroke-width="3" opacity="0.5"/>
+                        <path d="M22 34L22 26M22 26L18 30M22 26L26 30" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M58 34L58 26M58 26L54 30M58 26L62 30" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <div class="upload-text">Drop Images Here</div>
+                <div class="upload-hint">or click to browse • PNG, JPG, WebP, GIF</div>
+                <input type="file" id="imageInput" accept="image/*" multiple style="display:none">
+            </div>
+        </div>
+
+        <!-- EDITOR SCREEN -->
+        <div id="editorScreen">
+
+            <!-- Sheet Preview (75%) -->
+            <div class="frames-area" id="framesArea">
+                <canvas id="sheetPreview"></canvas>
+            </div>
+
+            <!-- Builder Strip (25%) -->
+            <div class="builder-area">
+                <div class="builder-header">
+                    <div class="title-group">
+                        <h2 class="panel-title">
+                            <span class="title-icon">⊞</span> Frames
+                        </h2>
+                        <span id="frameCounter" class="frame-badge">0 frames</span>
+                    </div>
+                    <div class="builder-actions">
+                        <button class="btn-secondary" id="addMoreBtn" title="Add more images">
+                            <span class="btn-icon">+</span> Add
+                        </button>
+                        <button class="btn-secondary" id="clearBtn" title="Clear all frames">
+                            <span class="btn-icon">↺</span> Clear
+                        </button>
+                        <button class="btn-primary" id="exportBtn" title="Download sprite sheet">
+                            <span class="btn-icon">↓</span> Export Sheet
+                        </button>
+                    </div>
+                </div>
+
+                <div class="sprite-grid-container">
+                    <div class="sprite-grid" id="spriteGrid"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // ── State ──────────────────────────────────────────────────────────────
+        let frames = [];          // { img: HTMLImageElement, name: string }
+        let dragSrcIndex = null;
+
+        const COLS = 5;           // max sprites per row (matches keyframe extractor)
+
+        // ── DOM ────────────────────────────────────────────────────────────────
+        const uploadZone      = document.getElementById('uploadZone');
+        const imageInput      = document.getElementById('imageInput');
+        const dropScreen      = document.getElementById('dropScreen');
+        const editorScreen    = document.getElementById('editorScreen');
+        const spriteGrid      = document.getElementById('spriteGrid');
+        const frameCounter    = document.getElementById('frameCounter');
+        const sheetPreview    = document.getElementById('sheetPreview');
+        const exportBtn       = document.getElementById('exportBtn');
+        const clearBtn        = document.getElementById('clearBtn');
+        const addMoreBtn      = document.getElementById('addMoreBtn');
+        const loadingOverlay  = document.getElementById('loadingOverlay');
+        const globalDropOverlay = document.getElementById('globalDropOverlay');
+
+        // Hidden file input for "add more"
+        const addMoreInput = document.createElement('input');
+        addMoreInput.type = 'file';
+        addMoreInput.accept = 'image/*';
+        addMoreInput.multiple = true;
+        document.body.appendChild(addMoreInput);
+
+        // ── Upload Zone ────────────────────────────────────────────────────────
+        uploadZone.addEventListener('click', () => imageInput.click());
+
+        ['dragenter','dragover','dragleave','drop'].forEach(ev => {
+            uploadZone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); });
+        });
+
+        uploadZone.addEventListener('dragenter', () => uploadZone.classList.add('dragover'));
+        uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+        uploadZone.addEventListener('dragover',  () => uploadZone.classList.add('dragover'));
+
+        uploadZone.addEventListener('drop', e => {
+            uploadZone.classList.remove('dragover');
+            loadFiles(Array.from(e.dataTransfer.files));
+        });
+
+        imageInput.addEventListener('change', e => loadFiles(Array.from(e.target.files)));
+        addMoreInput.addEventListener('change', e => loadFiles(Array.from(e.target.files)));
+
+        addMoreBtn.addEventListener('click', () => addMoreInput.click());
+        clearBtn.addEventListener('click', clearAll);
+        exportBtn.addEventListener('click', exportSheet);
+
+        // ── Global drag-over (when editor is showing) ──────────────────────────
+        document.addEventListener('dragenter', e => {
+            if (editorScreen.style.display !== 'none' && e.dataTransfer?.types.includes('Files')) {
+                globalDropOverlay.classList.add('active');
+            }
+        });
+        document.addEventListener('dragleave', e => {
+            if (e.relatedTarget === null) globalDropOverlay.classList.remove('active');
+        });
+        document.addEventListener('dragover', e => e.preventDefault());
+        document.addEventListener('drop', e => {
+            e.preventDefault();
+            globalDropOverlay.classList.remove('active');
+            if (editorScreen.style.display !== 'none') {
+                loadFiles(Array.from(e.dataTransfer.files));
+            }
+        });
+
+        // ── Load Files ─────────────────────────────────────────────────────────
+        function loadFiles(files) {
+            const imageFiles = files.filter(f => f.type.startsWith('image/'));
+            if (!imageFiles.length) return;
+
+            let loaded = 0;
+            imageFiles.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = re => {
+                    const img = new Image();
+                    img.onload = () => {
+                        frames.push({ img, name: file.name });
+                        loaded++;
+                        if (loaded === imageFiles.length) {
+                            HubAudio.play('select');
+                            showEditor();
+                            rebuildGrid();
+                            renderSheet();
+                        }
+                    };
+                    img.src = re.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // ── Show / hide screens ────────────────────────────────────────────────
+        function showEditor() {
+            dropScreen.style.display = 'none';
+            editorScreen.style.display = 'flex';
+        }
+
+        function clearAll() {
+            HubAudio.play('back');
+            frames = [];
+            dropScreen.style.display = 'flex';
+            editorScreen.style.display = 'none';
+            spriteGrid.innerHTML = '';
+            sheetPreview.width = 0;
+            sheetPreview.height = 0;
+            imageInput.value = '';
+            addMoreInput.value = '';
+        }
+
+        // ── Grid ───────────────────────────────────────────────────────────────
+        function rebuildGrid() {
+            spriteGrid.innerHTML = '';
+
+            frames.forEach((frame, index) => {
+                const slot = document.createElement('div');
+                slot.className = 'sprite-slot';
+                slot.style.animationDelay = `${index * 30}ms`;
+                slot.draggable = true;
+
+                const img = document.createElement('img');
+                img.src = frame.img.src;
+
+                const badge = document.createElement('div');
+                badge.className = 'sprite-slot-number';
+                badge.textContent = index + 1;
+
+                const del = document.createElement('div');
+                del.className = 'delete-btn';
+                del.textContent = '✕';
+                del.title = 'Remove frame';
+                del.onclick = e => {
+                    e.stopPropagation();
+                    HubAudio.play('back');
+                    slot.style.transition = 'transform 0.15s ease, opacity 0.15s ease';
+                    slot.style.transform = 'scale(0.7)';
+                    slot.style.opacity = '0';
+                    setTimeout(() => {
+                        frames.splice(index, 1);
+                        if (frames.length === 0) { clearAll(); return; }
+                        rebuildGrid();
+                        renderSheet();
+                    }, 150);
+                };
+
+                // Drag-to-reorder
+                slot.addEventListener('dragstart', () => {
+                    dragSrcIndex = index;
+                    setTimeout(() => slot.classList.add('dragging'), 0);
+                });
+
+                slot.addEventListener('dragend', () => {
+                    slot.classList.remove('dragging');
+                    document.querySelectorAll('.sprite-slot').forEach(s => s.classList.remove('drag-over'));
+                });
+
+                slot.addEventListener('dragover', e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    document.querySelectorAll('.sprite-slot').forEach(s => s.classList.remove('drag-over'));
+                    slot.classList.add('drag-over');
+                });
+
+                slot.addEventListener('drop', e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    slot.classList.remove('drag-over');
+                    if (dragSrcIndex === null || dragSrcIndex === index) return;
+                    // Reorder
+                    const moved = frames.splice(dragSrcIndex, 1)[0];
+                    frames.splice(index, 0, moved);
+                    dragSrcIndex = null;
+                    rebuildGrid();
+                    renderSheet();
+                });
+
+                slot.appendChild(del);
+                slot.appendChild(badge);
+                slot.appendChild(img);
+                spriteGrid.appendChild(slot);
+            });
+
+            // Add more button inside strip
+            const addSlot = document.createElement('div');
+            addSlot.className = 'add-slot';
+            addSlot.title = 'Add more images';
+            addSlot.textContent = '+';
+            addSlot.onclick = () => addMoreInput.click();
+            spriteGrid.appendChild(addSlot);
+
+            // Scroll to end
+            setTimeout(() => {
+                const container = spriteGrid.parentElement;
+                container.scrollLeft = container.scrollWidth;
+            }, 50);
+
+            updateCounter();
+        }
+
+        function updateCounter() {
+            const n = frames.length;
+            frameCounter.textContent = `${n} frame${n !== 1 ? 's' : ''}`;
+            frameCounter.classList.toggle('has-frames', n > 0);
+            frameCounter.classList.add('pop');
+            setTimeout(() => frameCounter.classList.remove('pop'), 150);
+        }
+
+        // ── Render Sheet Preview ───────────────────────────────────────────────
+        function renderSheet() {
+            if (frames.length === 0) return;
+
+            // Use the size of the first frame as the tile size
+            const tileW = frames[0].img.naturalWidth;
+            const tileH = frames[0].img.naturalHeight;
+
+            const cols = Math.min(COLS, frames.length);
+            const rows = Math.ceil(frames.length / COLS);
+
+            sheetPreview.width  = tileW * cols;
+            sheetPreview.height = tileH * rows;
+
+            const ctx = sheetPreview.getContext('2d');
+            ctx.imageSmoothingEnabled = false;
+            ctx.clearRect(0, 0, sheetPreview.width, sheetPreview.height);
+
+            frames.forEach((frame, i) => {
+                const col = i % COLS;
+                const row = Math.floor(i / COLS);
+                ctx.drawImage(frame.img, col * tileW, row * tileH, tileW, tileH);
+            });
+        }
+
+        // ── Export ─────────────────────────────────────────────────────────────
+        function exportSheet() {
+            if (frames.length === 0) return;
+
+            loadingOverlay.querySelector('.loading-text').textContent    = 'GENERATING';
+            loadingOverlay.querySelector('.loading-subtext').textContent = `Compositing ${frames.length} frames...`;
+            loadingOverlay.classList.add('active');
+
+            setTimeout(() => {
+                sheetPreview.toBlob(blob => {
+                    const url  = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href     = url;
+                    link.download = `spritesheet_${frames.length}frames.png`;
+                    link.click();
+                    setTimeout(() => URL.revokeObjectURL(url), 100);
+                    HubAudio.play('chord');
+
+                    loadingOverlay.querySelector('.loading-text').textContent    = 'SUCCESS';
+                    loadingOverlay.querySelector('.loading-subtext').textContent = 'Sprite sheet downloaded!';
+                    setTimeout(() => loadingOverlay.classList.remove('active'), 800);
+                }, 'image/png');
+            }, 200);
+        }
+
+        // ── Keyboard ───────────────────────────────────────────────────────────
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') clearAll();
+            if (e.key === 'Enter' && frames.length > 0) exportSheet();
+        });
+    </script>
+</body>
+</html>

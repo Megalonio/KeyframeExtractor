@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YT → MP3 — Hub</title>
+    <link rel="stylesheet" href="hub.css">
+    <script src="hub-audio.js"></script>
+    <style>
+        body { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+        .tool-body {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            z-index: 2;
+            padding: 30px;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        /* ── CARD ── */
+        .card {
+            width: 100%;
+            max-width: 600px;
+            background: var(--bg-darker);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* top glow line */
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+            opacity: 0.6;
+        }
+
+        .card-header {
+            padding: 24px 28px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .card-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: var(--accent-cyan);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin-bottom: 4px;
+        }
+
+        .card-sub {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+        }
+
+        .card-body {
+            padding: 24px 28px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* ── FIELD ── */
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+
+        .field-label {
+            font-size: 0.58rem;
+            font-weight: 700;
+            color: var(--accent-pink);
+            text-transform: uppercase;
+            letter-spacing: 2.5px;
+        }
+
+        .field-input {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 11px 14px;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.82rem;
+            color: var(--text-light);
+            width: 100%;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .field-input:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 0 2px rgba(0,255,255,0.08);
+            color: var(--accent-cyan);
+        }
+
+        .field-input::placeholder { color: var(--text-muted); opacity: 0.5; }
+
+        /* ── OPTIONS ROW ── */
+        .options-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        /* ── SELECT ── */
+        .field-select {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 11px 14px;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--text-light);
+            width: 100%;
+            transition: border-color 0.2s ease;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237b8cde' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 32px;
+        }
+
+        .field-select:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+        }
+
+        .field-select option {
+            background: var(--bg-darker);
+            color: var(--text-light);
+        }
+
+        /* ── OUTPUT DIR ── */
+        .dir-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .dir-row .field-input { flex: 1; }
+
+        .dir-hint {
+            font-size: 0.58rem;
+            color: var(--text-muted);
+            opacity: 0.6;
+            margin-top: -6px;
+        }
+
+        /* ── PREVIEW BOX ── */
+        .bat-preview {
+            background: #000;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 14px 16px;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.68rem;
+            color: #a0e8a0;
+            line-height: 1.9;
+            white-space: pre-wrap;
+            word-break: break-all;
+            min-height: 80px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .bat-preview::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(0,255,100,0.3), transparent);
+        }
+
+        .bat-prompt {
+            color: var(--accent-cyan);
+            user-select: none;
+        }
+
+        /* ── CARD FOOTER ── */
+        .card-footer {
+            padding: 16px 28px 24px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            border-top: 1px solid var(--border);
+        }
+
+        .note {
+            flex: 1;
+            font-size: 0.58rem;
+            color: var(--text-muted);
+            opacity: 0.6;
+            line-height: 1.6;
+        }
+
+        .note a {
+            color: var(--accent-cyan);
+            text-decoration: none;
+        }
+
+        .note a:hover { text-decoration: underline; }
+
+        /* ── SUCCESS FLASH ── */
+        @keyframes successFlash {
+            0%   { background: rgba(0,255,255,0.08); }
+            100% { background: transparent; }
+        }
+
+        .card.flashing { animation: successFlash 0.6s ease-out; }
+    </style>
+</head>
+<body>
+
+    <nav class="hub-nav">
+        <a class="hub-nav-brand" href="hub.html">
+            <span class="hub-nav-brand-diamond"></span>
+            Dev Hub
+        </a>
+        <div class="hub-nav-title">▶ YT → MP3</div>
+    </nav>
+
+    <div class="tool-body">
+        <div class="card" id="card">
+            <div class="card-header">
+                <div class="card-title">▶ YouTube → MP3</div>
+                <div class="card-sub">Generates a .bat file — run it once to download your MP3</div>
+            </div>
+
+            <div class="card-body">
+
+                <!-- URL -->
+                <div class="field">
+                    <div class="field-label">YouTube URL</div>
+                    <input class="field-input" id="urlInput" type="text"
+                        placeholder="https://www.youtube.com/watch?v=..." spellcheck="false" autocomplete="off">
+                </div>
+
+                <!-- Options -->
+                <div class="options-row">
+                    <div class="field">
+                        <div class="field-label">Audio Quality</div>
+                        <select class="field-select" id="qualitySelect">
+                            <option value="0" selected>0 — Best (320k)</option>
+                            <option value="1">1 — Near-best</option>
+                            <option value="2">2 — High (192k)</option>
+                            <option value="5">5 — Medium (128k)</option>
+                            <option value="9">9 — Smallest</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <div class="field-label">Format</div>
+                        <select class="field-select" id="formatSelect">
+                            <option value="mp3" selected>MP3</option>
+                            <option value="flac">FLAC (lossless)</option>
+                            <option value="wav">WAV</option>
+                            <option value="aac">AAC</option>
+                            <option value="opus">Opus</option>
+                            <option value="m4a">M4A</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Output folder -->
+                <div class="field">
+                    <div class="field-label">Output Folder</div>
+                    <input class="field-input" id="outputDir" type="text"
+                        value="%USERPROFILE%\Music" spellcheck="false">
+                    <div class="dir-hint">Use %USERPROFILE%\Music, C:\Downloads, etc.</div>
+                </div>
+
+                <!-- BAT Preview -->
+                <div class="bat-preview" id="batPreview"></div>
+
+            </div>
+
+            <div class="card-footer">
+                <div class="note">
+                    Requires <a href="https://github.com/yt-dlp/yt-dlp" target="_blank">yt-dlp</a>
+                    and <a href="https://ffmpeg.org" target="_blank">ffmpeg</a> in PATH.<br>
+                    Run the .bat file once — it downloads and converts automatically.
+                </div>
+                <button class="btn-primary" id="downloadBtn">
+                    <span class="btn-icon">↓</span> Get .bat
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const urlInput     = document.getElementById('urlInput');
+        const qualitySelect= document.getElementById('qualitySelect');
+        const formatSelect = document.getElementById('formatSelect');
+        const outputDir    = document.getElementById('outputDir');
+        const batPreview   = document.getElementById('batPreview');
+        const downloadBtn  = document.getElementById('downloadBtn');
+        const card         = document.getElementById('card');
+
+        function buildBat() {
+            const url     = urlInput.value.trim() || 'PASTE_URL_HERE';
+            const quality = qualitySelect.value;
+            const fmt     = formatSelect.value;
+            const outDir  = outputDir.value.trim() || '%USERPROFILE%\\Music';
+
+            // Use YTMP3 subfolder
+            const finalDir = `${outDir}\\YTMP3`;
+
+            // FLAC and WAV don't use --audio-quality
+            const qualityFlag = (fmt === 'flac' || fmt === 'wav')
+                ? ''
+                : ` --audio-quality ${quality}`;
+
+            const lines = [
+                `@echo off`,
+                ``,
+                `set URL=${url}`,
+                `set OUTDIR=${finalDir}`,
+                ``,
+                `echo Downloading: %URL%`,
+                `echo Output:      %OUTDIR%`,
+                `echo.`,
+                ``,
+                `REM Create folder if it doesn't exist`,
+                `if not exist "%OUTDIR%" mkdir "%OUTDIR%"`,
+                ``,
+                `yt-dlp ^`,
+                `  --extract-audio ^`,
+                `  --audio-format ${fmt}${qualityFlag ? ` ^\n  --audio-quality ${quality}` : ''} ^`,
+                `  --embed-thumbnail ^`,
+                `  --add-metadata ^`,
+                `  --output "%OUTDIR%\\%(title)s.%(ext)s" ^`,
+                `  "%URL%"`,
+                ``,
+                `echo.`,
+                `echo Done! Check %OUTDIR%`,
+                `pause`,
+            ];
+
+            return lines.join('\r\n');
+        }
+
+        function updatePreview() {
+            const url     = urlInput.value.trim() || 'PASTE_URL_HERE';
+            const quality = qualitySelect.value;
+            const fmt     = formatSelect.value;
+            const outDir  = outputDir.value.trim() || '%USERPROFILE%\\Music';
+            const qualityFlag = (fmt === 'flac' || fmt === 'wav') ? '' : ` --audio-quality ${quality}`;
+
+            batPreview.innerHTML =
+                `<span class="bat-prompt">@echo off\n</span>` +
+                `yt-dlp --extract-audio --audio-format <span style="color:var(--accent-cyan)">${fmt}</span>${qualityFlag} ^\n` +
+                `  --embed-thumbnail --add-metadata ^\n` +
+                `  --output <span style="color:var(--accent-pink)">"${outDir}\\YTMP3\\%(title)s.%(ext)s"</span> ^\n` +
+                `  <span style="color:#ffd080">"${url}"</span>`;
+        }
+
+        [urlInput, qualitySelect, formatSelect, outputDir].forEach(el => {
+            el.addEventListener('input', () => { updatePreview(); HubAudio.play('cursor'); });
+            el.addEventListener('change', () => { updatePreview(); HubAudio.play('cursor'); });
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            const bat = buildBat();
+            const blob = new Blob([bat], { type: 'text/plain' });
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+
+            const rawUrl = urlInput.value.trim();
+            a.download = rawUrl ? 'download_yt.bat' : 'yt_downloader.bat';
+            a.href = url;
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 100);
+
+            HubAudio.play('chord');
+            card.classList.add('flashing');
+            setTimeout(() => card.classList.remove('flashing'), 600);
+        });
+
+        // Enter key generates the bat
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && document.activeElement !== downloadBtn) {
+                downloadBtn.click();
+            }
+        });
+
+        // Init
+        updatePreview();
+    </script>
+</body>
+</html>

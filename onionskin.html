@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Onionskin Aligner — Hub</title>
+    <link rel="stylesheet" href="hub.css">
+    <script src="hub-audio.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        body { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+        /* ══════════════════════════════════════
+           THREE-COLUMN WORKSPACE
+        ══════════════════════════════════════ */
+        .workspace {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 220px 1fr 220px;
+            grid-template-rows: 1fr 140px;
+            min-height: 0;
+            position: relative;
+            z-index: 2;
+        }
+
+        /* ── LEFT PANEL: imported files ── */
+        .panel-imports {
+            grid-row: 1 / 2;
+            grid-column: 1 / 2;
+            background: var(--bg-darker);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .panel-header {
+            padding: 10px 14px 8px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .panel-header-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 0.6rem;
+            font-weight: 800;
+            color: var(--accent-pink);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+        }
+
+        .panel-add-btn {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 4px 10px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .panel-add-btn:hover {
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+        }
+
+        .imports-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border) transparent;
+        }
+
+        /* Drop zone inside imports */
+        .imports-dropzone {
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            padding: 20px 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: var(--text-muted);
+            font-size: 0.65rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .imports-dropzone:hover, .imports-dropzone.dragover {
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+            background: rgba(0,255,255,0.03);
+        }
+
+        /* Individual imported frame thumbnail */
+        .import-thumb {
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: var(--surface);
+            padding: 6px;
+            cursor: grab;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.15s ease;
+            user-select: none;
+        }
+
+        .import-thumb:hover {
+            border-color: var(--accent-cyan);
+            background: rgba(0,255,255,0.04);
+        }
+
+        .import-thumb.dragging { opacity: 0.4; }
+
+        .import-thumb img {
+            width: 36px; height: 36px;
+            object-fit: cover;
+            border-radius: 3px;
+            image-rendering: pixelated;
+            pointer-events: none;
+        }
+
+        .import-thumb-name {
+            font-size: 0.58rem;
+            color: var(--text-muted);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+        }
+
+        /* ── CENTER: canvas viewport ── */
+        .panel-canvas {
+            grid-row: 1 / 2;
+            grid-column: 2 / 3;
+            background: #000;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* checkerboard bg */
+        .panel-canvas::before {
+            content: '';
+            position: absolute; inset: 0;
+            background-image:
+                linear-gradient(45deg, #111 25%, transparent 25%),
+                linear-gradient(-45deg, #111 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #111 75%),
+                linear-gradient(-45deg, transparent 75%, #111 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            opacity: 0.5;
+        }
+
+        #mainCanvas {
+            position: relative;
+            z-index: 1;
+            image-rendering: pixelated;
+            cursor: crosshair;
+        }
+
+        /* zoom indicator */
+        .zoom-badge {
+            position: absolute;
+            bottom: 10px; right: 10px;
+            background: var(--bg-darker);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 4px 10px;
+            font-size: 0.65rem;
+            color: var(--accent-cyan);
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        /* nudge step badge */
+        .step-badge {
+            position: absolute;
+            bottom: 10px; left: 10px;
+            background: var(--bg-darker);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 4px 10px;
+            font-size: 0.65rem;
+            color: var(--accent-pink);
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        /* ── RIGHT PANEL: onionskin controls ── */
+        .panel-onion {
+            grid-row: 1 / 2;
+            grid-column: 3 / 4;
+            background: var(--bg-darker);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            gap: 0;
+        }
+
+        .onion-section {
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .onion-section-title {
+            font-size: 0.55rem;
+            font-weight: 700;
+            color: var(--accent-pink);
+            text-transform: uppercase;
+            letter-spacing: 2.5px;
+            margin-bottom: 10px;
+        }
+
+        /* Step selector */
+        .step-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .step-btn {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.68rem;
+            font-weight: 700;
+            padding: 7px 0;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-align: center;
+        }
+
+        .step-btn:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+        .step-btn.active {
+            border-color: var(--accent-cyan);
+            color: var(--bg-dark);
+            background: var(--accent-cyan);
+        }
+
+        /* Zoom controls */
+        .zoom-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .zoom-btn {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.9rem;
+            font-weight: 700;
+            width: 32px; height: 32px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: transparent;
+            color: var(--text-light);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .zoom-btn:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+
+        .zoom-label {
+            flex: 1;
+            text-align: center;
+            font-size: 0.7rem;
+            color: var(--accent-cyan);
+        }
+
+        /* Onion skin opacity */
+        .opacity-row {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .opacity-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.62rem;
+            color: var(--text-muted);
+        }
+
+        .opacity-label span { color: var(--accent-cyan); }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--border);
+            outline: none;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            background: var(--accent-cyan);
+            cursor: pointer;
+            box-shadow: 0 0 6px rgba(0,255,255,0.4);
+        }
+
+        /* Active frame indicator */
+        .active-frame-info {
+            font-size: 0.62rem;
+            color: var(--text-muted);
+            line-height: 1.8;
+        }
+
+        .active-frame-info strong {
+            color: var(--accent-cyan);
+            display: block;
+            font-size: 0.85rem;
+            margin-bottom: 2px;
+        }
+
+        /* Nudge hint */
+        .nudge-hint {
+            font-size: 0.58rem;
+            color: var(--text-muted);
+            line-height: 1.9;
+            opacity: 0.7;
+        }
+
+        .nudge-hint .hint-key {
+            font-size: 0.58rem;
+            padding: 1px 5px;
+        }
+
+        /* Export button */
+        .export-section {
+            padding: 12px 14px;
+            margin-top: auto;
+            border-top: 1px solid var(--border);
+        }
+
+        /* ── BOTTOM: timeline ── */
+        .panel-timeline {
+            grid-row: 2 / 3;
+            grid-column: 1 / 4;
+            background: var(--bg-darker);
+            border-top: 2px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            position: relative;
+        }
+
+        .panel-timeline::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+            opacity: 0.4;
+        }
+
+        .timeline-header {
+            padding: 6px 14px 4px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .timeline-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 0.58rem;
+            font-weight: 800;
+            color: var(--accent-cyan);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+        }
+
+        .timeline-hint {
+            font-size: 0.55rem;
+            color: var(--text-muted);
+            opacity: 0.6;
+        }
+
+        .timeline-track {
+            flex: 1;
+            overflow-x: auto;
+            overflow-y: hidden;
+            display: flex;
+            align-items: center;
+            padding: 0 14px 8px;
+            gap: 8px;
+            scrollbar-width: thin;
+            scrollbar-color: var(--accent-cyan) var(--border);
+        }
+
+        .timeline-track::-webkit-scrollbar { height: 6px; }
+        .timeline-track::-webkit-scrollbar-track { background: var(--surface); border-radius: 3px; }
+        .timeline-track::-webkit-scrollbar-thumb { background: linear-gradient(90deg, var(--accent-cyan), var(--accent-pink)); border-radius: 3px; }
+
+        /* Timeline slot */
+        .timeline-slot {
+            flex-shrink: 0;
+            width: 72px; height: 72px;
+            border: 2px solid var(--border);
+            border-radius: 4px;
+            background: var(--surface);
+            position: relative;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: slotAppear 0.2s ease-out backwards;
+        }
+
+        .timeline-slot:hover { border-color: var(--accent-cyan); transform: translateY(-2px); }
+
+        .timeline-slot.active {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 16px rgba(0,255,255,0.35);
+        }
+
+        .timeline-slot.drag-over {
+            border-color: var(--accent-pink);
+            box-shadow: 0 0 16px rgba(255,0,255,0.35);
+            transform: scale(1.06);
+        }
+
+        .timeline-slot img {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            border-radius: 2px;
+            image-rendering: pixelated;
+            pointer-events: none;
+        }
+
+        .timeline-slot-num {
+            position: absolute;
+            bottom: 2px; right: 3px;
+            font-size: 0.55rem;
+            font-weight: 700;
+            background: rgba(0,255,255,0.85);
+            color: var(--bg-dark);
+            padding: 1px 4px;
+            border-radius: 2px;
+            pointer-events: none;
+        }
+
+        .timeline-slot-del {
+            position: absolute;
+            top: 2px; right: 2px;
+            width: 16px; height: 16px;
+            background: rgba(0,0,0,0.8);
+            border: 1px solid var(--border);
+            border-radius: 50%;
+            font-size: 9px;
+            color: white;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            opacity: 0;
+            transition: all 0.15s ease;
+        }
+
+        .timeline-slot:hover .timeline-slot-del { opacity: 1; }
+        .timeline-slot-del:hover { background: var(--accent-pink); border-color: var(--accent-pink); }
+
+        /* Drop-here placeholder */
+        .timeline-drop-hint {
+            flex-shrink: 0;
+            width: 72px; height: 72px;
+            border: 2px dashed var(--border);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            opacity: 0.4;
+            transition: all 0.2s ease;
+        }
+
+        .timeline-drop-hint.active {
+            opacity: 1;
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+            box-shadow: 0 0 12px rgba(0,255,255,0.2);
+        }
+
+        /* Loading overlay */
+        #loadingOverlay { display: none; }
+        #loadingOverlay.active { display: flex; }
+    </style>
+</head>
+<body>
+
+    <nav class="hub-nav">
+        <a class="hub-nav-brand" href="hub.html">
+            <span class="hub-nav-brand-diamond"></span>
+            Dev Hub
+        </a>
+        <div class="hub-nav-title">◎ Onionskin Aligner</div>
+    </nav>
+
+    <div id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">EXPORTING</div>
+        <div class="loading-subtext">Building sprite sheet...</div>
+    </div>
+
+    <div class="workspace">
+
+        <!-- ── LEFT: imports ── -->
+        <div class="panel-imports">
+            <div class="panel-header">
+                <div class="panel-header-title">◈ Frames</div>
+                <button class="panel-add-btn" id="addImportBtn">+ Add</button>
+            </div>
+            <div class="imports-list" id="importsList">
+                <div class="imports-dropzone" id="importsDropzone">
+                    Drop images here
+                </div>
+            </div>
+        </div>
+
+        <!-- ── CENTER: canvas ── -->
+        <div class="panel-canvas" id="canvasWrap">
+            <canvas id="mainCanvas"></canvas>
+            <div class="zoom-badge" id="zoomBadge">100%</div>
+            <div class="step-badge" id="stepBadge">1px step</div>
+        </div>
+
+        <!-- ── RIGHT: onionskin controls ── -->
+        <div class="panel-onion">
+
+            <div class="onion-section">
+                <div class="onion-section-title">Nudge Step</div>
+                <div class="step-grid">
+                    <button class="step-btn active" data-step="1">1 px</button>
+                    <button class="step-btn" data-step="2">2 px</button>
+                    <button class="step-btn" data-step="4">4 px</button>
+                    <button class="step-btn" data-step="8">8 px</button>
+                </div>
+            </div>
+
+            <div class="onion-section">
+                <div class="onion-section-title">Zoom</div>
+                <div class="zoom-row">
+                    <button class="zoom-btn" id="zoomOut">−</button>
+                    <div class="zoom-label" id="zoomLabel">1×</div>
+                    <button class="zoom-btn" id="zoomIn">+</button>
+                </div>
+            </div>
+
+            <div class="onion-section">
+                <div class="onion-section-title">Onion Opacity</div>
+                <div class="opacity-row">
+                    <div class="opacity-label">
+                        Prev <span id="opacityVal">50%</span> Next
+                    </div>
+                    <input type="range" id="opacitySlider" min="5" max="90" value="50">
+                </div>
+            </div>
+
+            <div class="onion-section">
+                <div class="onion-section-title">Active Frame</div>
+                <div class="active-frame-info" id="activeFrameInfo">
+                    <strong>—</strong>
+                    Select a frame in the timeline to align it.
+                </div>
+            </div>
+
+            <div class="onion-section">
+                <div class="onion-section-title">Nudge Keys</div>
+                <div class="nudge-hint">
+                    <span class="hint-key">←↑↓→</span> Nudge frame<br>
+                    <span class="hint-key">Shift</span>+arrows × 4<br>
+                    <span class="hint-key">0</span> Reset offset<br>
+                    <span class="hint-key">[</span><span class="hint-key">]</span> Prev/Next frame
+                </div>
+            </div>
+
+            <div class="export-section">
+                <button class="btn-primary" id="exportBtn" style="width:100%; justify-content:center;">
+                    <span class="btn-icon">↓</span> Export Sheet
+                </button>
+            </div>
+        </div>
+
+        <!-- ── BOTTOM: timeline ── -->
+        <div class="panel-timeline">
+            <div class="timeline-header">
+                <div class="timeline-title">⬡ Timeline</div>
+                <div class="timeline-hint">Drag frames from the left panel • Click to select</div>
+            </div>
+            <div class="timeline-track" id="timelineTrack">
+                <div class="timeline-drop-hint" id="timelineDropHint">+</div>
+            </div>
+        </div>
+
+    </div>
+
+    <input type="file" id="fileInput" accept="image/*" multiple style="display:none">
+
+    <script>
+    // ══════════════════════════════════════════════════════════════════════
+    //  STATE
+    // ══════════════════════════════════════════════════════════════════════
+    let importedFrames = [];  // { id, name, img }
+    let timeline       = [];  // { frameId, offX, offY }  — ordered
+    let activeIdx      = -1;  // index into timeline
+    let zoom           = 1;
+    let nudgeStep      = 1;
+    let onionOpacity   = 0.5;
+    let nextId         = 0;
+    let panX           = 0;
+    let panY           = 0;
+    let isPanning      = false;
+    let panStartX      = 0;
+    let panStartY      = 0;
+
+    const ZOOM_STEPS = [0.25, 0.5, 1, 2, 3, 4, 6, 8];
+    let zoomIdx = 2; // starts at 1×
+
+    const COLS = 5;
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  DOM REFS
+    // ══════════════════════════════════════════════════════════════════════
+    const canvas         = document.getElementById('mainCanvas');
+    const ctx            = canvas.getContext('2d');
+    const importsList    = document.getElementById('importsList');
+    const importsDropzone= document.getElementById('importsDropzone');
+    const timelineTrack  = document.getElementById('timelineTrack');
+    const dropHint       = document.getElementById('timelineDropHint');
+    const zoomBadge      = document.getElementById('zoomBadge');
+    const stepBadge      = document.getElementById('stepBadge');
+    const zoomLabel      = document.getElementById('zoomLabel');
+    const opacitySlider  = document.getElementById('opacitySlider');
+    const opacityVal     = document.getElementById('opacityVal');
+    const activeFrameInfo= document.getElementById('activeFrameInfo');
+    const exportBtn      = document.getElementById('exportBtn');
+    const fileInput      = document.getElementById('fileInput');
+    const addImportBtn   = document.getElementById('addImportBtn');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  FILE LOADING
+    // ══════════════════════════════════════════════════════════════════════
+    addImportBtn.addEventListener('click', () => fileInput.click());
+    importsDropzone.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', e => loadFiles(Array.from(e.target.files)));
+
+    // drag onto imports dropzone
+    importsDropzone.addEventListener('dragover',  e => { e.preventDefault(); importsDropzone.classList.add('dragover'); });
+    importsDropzone.addEventListener('dragleave', () => importsDropzone.classList.remove('dragover'));
+    importsDropzone.addEventListener('drop', e => {
+        e.preventDefault();
+        importsDropzone.classList.remove('dragover');
+        loadFiles(Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/')));
+    });
+
+    // drag anywhere onto page
+    document.addEventListener('dragover', e => e.preventDefault());
+    document.addEventListener('drop', e => {
+        e.preventDefault();
+        const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+        if (files.length) loadFiles(files);
+    });
+
+    function loadFiles(files) {
+        let done = 0;
+        files.forEach(file => {
+            const reader = new FileReader();
+            reader.onload = re => {
+                const img = new Image();
+                img.onload = () => {
+                    importedFrames.push({ id: nextId++, name: file.name, img });
+                    done++;
+                    if (done === files.length) {
+                        HubAudio.play('select');
+                        rebuildImportsList();
+                    }
+                };
+                img.src = re.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  IMPORTS LIST
+    // ══════════════════════════════════════════════════════════════════════
+    function rebuildImportsList() {
+        // Keep dropzone, rebuild thumbs
+        importsList.innerHTML = '';
+        importsList.appendChild(importsDropzone);
+
+        importedFrames.forEach(frame => {
+            const thumb = document.createElement('div');
+            thumb.className = 'import-thumb';
+            thumb.draggable = true;
+            thumb.dataset.id = frame.id;
+
+            const img = document.createElement('img');
+            img.src = frame.img.src;
+
+            const name = document.createElement('div');
+            name.className = 'import-thumb-name';
+            name.textContent = frame.name;
+
+            thumb.appendChild(img);
+            thumb.appendChild(name);
+            importsList.appendChild(thumb);
+
+            // Drag to timeline
+            thumb.addEventListener('dragstart', e => {
+                e.dataTransfer.setData('import-id', frame.id);
+                thumb.classList.add('dragging');
+            });
+            thumb.addEventListener('dragend', () => thumb.classList.remove('dragging'));
+        });
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  TIMELINE
+    // ══════════════════════════════════════════════════════════════════════
+    timelineTrack.addEventListener('dragover', e => {
+        e.preventDefault();
+        dropHint.classList.add('active');
+    });
+
+    timelineTrack.addEventListener('dragleave', e => {
+        if (!timelineTrack.contains(e.relatedTarget)) {
+            dropHint.classList.remove('active');
+        }
+    });
+
+    timelineTrack.addEventListener('drop', e => {
+        e.preventDefault();
+        dropHint.classList.remove('active');
+
+        const importId = parseInt(e.dataTransfer.getData('import-id'));
+        const reorderIdx = e.dataTransfer.getData('reorder-idx');
+
+        if (!isNaN(importId) && e.dataTransfer.getData('import-id') !== '') {
+            // New frame from imports
+            const frame = importedFrames.find(f => f.id === importId);
+            if (frame) {
+                HubAudio.play('cursor');
+                timeline.push({ frameId: frame.id, offX: 0, offY: 0 });
+                rebuildTimeline();
+                setActive(timeline.length - 1);
+                renderCanvas();
+            }
+        }
+    });
+
+    function rebuildTimeline() {
+        timelineTrack.innerHTML = '';
+
+        timeline.forEach((entry, idx) => {
+            const frame = importedFrames.find(f => f.id === entry.frameId);
+            if (!frame) return;
+
+            const slot = document.createElement('div');
+            slot.className = `timeline-slot${idx === activeIdx ? ' active' : ''}`;
+            slot.style.animationDelay = `${idx * 25}ms`;
+
+            const img = document.createElement('img');
+            img.src = frame.img.src;
+
+            const num = document.createElement('div');
+            num.className = 'timeline-slot-num';
+            num.textContent = idx + 1;
+
+            const del = document.createElement('div');
+            del.className = 'timeline-slot-del';
+            del.textContent = '✕';
+            del.onclick = e => {
+                e.stopPropagation();
+                HubAudio.play('back');
+                timeline.splice(idx, 1);
+                if (activeIdx >= timeline.length) activeIdx = timeline.length - 1;
+                rebuildTimeline();
+                renderCanvas();
+                updateActiveInfo();
+            };
+
+            // Drag to reorder within timeline
+            slot.draggable = true;
+            slot.addEventListener('dragstart', e => {
+                e.dataTransfer.setData('reorder-idx', idx);
+                e.dataTransfer.setData('import-id', '');
+                setTimeout(() => slot.classList.add('dragging'), 0);
+            });
+            slot.addEventListener('dragend', () => slot.classList.remove('dragging'));
+            slot.addEventListener('dragover', e => {
+                e.preventDefault();
+                slot.classList.add('drag-over');
+            });
+            slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+            slot.addEventListener('drop', e => {
+                e.preventDefault();
+                e.stopPropagation();
+                slot.classList.remove('drag-over');
+                const fromIdx = parseInt(e.dataTransfer.getData('reorder-idx'));
+                if (!isNaN(fromIdx) && fromIdx !== idx) {
+                    const moved = timeline.splice(fromIdx, 1)[0];
+                    timeline.splice(idx, 0, moved);
+                    if (activeIdx === fromIdx) activeIdx = idx;
+                    HubAudio.play('cursor');
+                    rebuildTimeline();
+                    renderCanvas();
+                }
+            });
+
+            slot.addEventListener('click', () => {
+                setActive(idx);
+                renderCanvas();
+            });
+
+            slot.appendChild(del);
+            slot.appendChild(num);
+            slot.appendChild(img);
+            timelineTrack.appendChild(slot);
+        });
+
+        timelineTrack.appendChild(dropHint);
+    }
+
+    function setActive(idx) {
+        activeIdx = idx;
+        rebuildTimeline();
+        updateActiveInfo();
+    }
+
+    function updateActiveInfo() {
+        if (activeIdx < 0 || activeIdx >= timeline.length) {
+            activeFrameInfo.innerHTML = '<strong>—</strong>Select a frame in the timeline.';
+            return;
+        }
+        const entry = timeline[activeIdx];
+        const frame = importedFrames.find(f => f.id === entry.frameId);
+        activeFrameInfo.innerHTML = `
+            <strong>${frame ? frame.name : '?'}</strong>
+            Frame ${activeIdx + 1} of ${timeline.length}<br>
+            Offset: <span style="color:var(--accent-cyan)">${entry.offX >= 0 ? '+' : ''}${entry.offX}px, ${entry.offY >= 0 ? '+' : ''}${entry.offY}px</span>
+        `;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  CANVAS RENDER
+    // ══════════════════════════════════════════════════════════════════════
+    function getBaseSize() {
+        if (!importedFrames.length) return { w: 200, h: 200 };
+        const first = importedFrames[0].img;
+        return { w: first.naturalWidth, h: first.naturalHeight };
+    }
+
+    // Pixel-perfect tint — no ctx.filter (which causes blur)
+    function tintedCanvas(img, r, g, b) {
+        const oc   = document.createElement('canvas');
+        oc.width   = img.naturalWidth;
+        oc.height  = img.naturalHeight;
+        const octx = oc.getContext('2d');
+        octx.imageSmoothingEnabled = false;
+        octx.drawImage(img, 0, 0);
+        octx.globalCompositeOperation = 'multiply';
+        octx.fillStyle = `rgb(${r},${g},${b})`;
+        octx.fillRect(0, 0, oc.width, oc.height);
+        octx.globalCompositeOperation = 'destination-in';
+        octx.drawImage(img, 0, 0);
+        return oc;
+    }
+
+    function renderCanvas() {
+        const { w, h } = getBaseSize();
+        const wrap = document.getElementById('canvasWrap');
+        canvas.width  = wrap.clientWidth;
+        canvas.height = wrap.clientHeight;
+
+        ctx.imageSmoothingEnabled = false;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (timeline.length === 0) return;
+
+        const opacity = onionOpacity;
+        // Viewport centre + pan offset — always integer pixels
+        const ox = Math.round(canvas.width  / 2 + panX);
+        const oy = Math.round(canvas.height / 2 + panY);
+
+        // Ghost frames
+        for (let i = 0; i < timeline.length; i++) {
+            if (i === activeIdx) continue;
+            const frame = importedFrames.find(f => f.id === timeline[i].frameId);
+            if (!frame) continue;
+
+            const dist = Math.abs(i - activeIdx);
+            const ghostOpacity = opacity / (dist * 1.5);
+            if (ghostOpacity < 0.03) continue;
+
+            const isBefore = i < activeIdx;
+            // cyan (0,255,255) for prev, pink (255,0,255) for next — pixel-perfect
+            const tinted = tintedCanvas(frame.img,
+                isBefore ? 0 : 255,
+                isBefore ? 255 : 0,
+                255
+            );
+
+            ctx.save();
+            ctx.globalAlpha = ghostOpacity;
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(
+                tinted,
+                ox + Math.round(timeline[i].offX * zoom),
+                oy + Math.round(timeline[i].offY * zoom),
+                Math.round(w * zoom),
+                Math.round(h * zoom)
+            );
+            ctx.restore();
+        }
+
+        // Active frame — full opacity, no tint
+        if (activeIdx >= 0 && activeIdx < timeline.length) {
+            const entry = timeline[activeIdx];
+            const frame = importedFrames.find(f => f.id === entry.frameId);
+            if (frame) {
+                ctx.save();
+                ctx.globalAlpha = 1;
+                ctx.imageSmoothingEnabled = false;
+                ctx.drawImage(
+                    frame.img,
+                    ox + Math.round(entry.offX * zoom),
+                    oy + Math.round(entry.offY * zoom),
+                    Math.round(w * zoom),
+                    Math.round(h * zoom)
+                );
+                ctx.restore();
+            }
+        }
+
+        zoomBadge.textContent = `${Math.round(zoom * 100)}%`;
+        zoomLabel.textContent = `${zoom}×`;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  ZOOM
+    // ══════════════════════════════════════════════════════════════════════
+    document.getElementById('zoomIn').addEventListener('click', () => {
+        if (zoomIdx < ZOOM_STEPS.length - 1) { zoomIdx++; zoom = ZOOM_STEPS[zoomIdx]; renderCanvas(); }
+    });
+
+    document.getElementById('zoomOut').addEventListener('click', () => {
+        if (zoomIdx > 0) { zoomIdx--; zoom = ZOOM_STEPS[zoomIdx]; renderCanvas(); }
+    });
+
+    // Mouse wheel zoom (only when not middle-mouse panning)
+    document.getElementById('canvasWrap').addEventListener('wheel', e => {
+        e.preventDefault();
+        if (e.deltaY < 0 && zoomIdx < ZOOM_STEPS.length - 1) { zoomIdx++; }
+        else if (e.deltaY > 0 && zoomIdx > 0) { zoomIdx--; }
+        zoom = ZOOM_STEPS[zoomIdx];
+        renderCanvas();
+    }, { passive: false });
+
+    // ── Middle-mouse pan ──────────────────────────────────────────────────
+    const canvasWrap = document.getElementById('canvasWrap');
+
+    canvasWrap.addEventListener('mousedown', e => {
+        if (e.button === 1) {          // middle mouse
+            e.preventDefault();
+            isPanning  = true;
+            panStartX  = e.clientX - panX;
+            panStartY  = e.clientY - panY;
+            canvasWrap.style.cursor = 'grabbing';
+        }
+    });
+
+    window.addEventListener('mousemove', e => {
+        if (!isPanning) return;
+        panX = e.clientX - panStartX;
+        panY = e.clientY - panStartY;
+        renderCanvas();
+    });
+
+    window.addEventListener('mouseup', e => {
+        if (e.button === 1 && isPanning) {
+            isPanning = false;
+            canvasWrap.style.cursor = 'crosshair';
+        }
+    });
+
+    // Prevent middle-click scroll autoscroll
+    canvasWrap.addEventListener('auxclick', e => { if (e.button === 1) e.preventDefault(); });
+
+    // Resize: re-render without losing pan
+    window.addEventListener('resize', () => renderCanvas());
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  NUDGE STEP
+    // ══════════════════════════════════════════════════════════════════════
+    document.querySelectorAll('.step-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.step-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            nudgeStep = parseInt(btn.dataset.step);
+            stepBadge.textContent = `${nudgeStep}px step`;
+        });
+    });
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  OPACITY
+    // ══════════════════════════════════════════════════════════════════════
+    opacitySlider.addEventListener('input', () => {
+        onionOpacity = opacitySlider.value / 100;
+        opacityVal.textContent = `${opacitySlider.value}%`;
+        renderCanvas();
+    });
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  KEYBOARD
+    // ══════════════════════════════════════════════════════════════════════
+    document.addEventListener('keydown', e => {
+        // Frame navigation
+        if (e.key === '[') {
+            e.preventDefault();
+            if (activeIdx > 0) { HubAudio.play('cursor'); setActive(activeIdx - 1); renderCanvas(); }
+            return;
+        }
+        if (e.key === ']') {
+            e.preventDefault();
+            if (activeIdx < timeline.length - 1) { HubAudio.play('cursor'); setActive(activeIdx + 1); renderCanvas(); }
+            return;
+        }
+
+        // Export
+        if (e.key === 'Enter' && !e.repeat) {
+            e.preventDefault();
+            exportSheet();
+            return;
+        }
+
+        // Nudge
+        if (activeIdx < 0 || activeIdx >= timeline.length) return;
+
+        const step = e.shiftKey ? nudgeStep * 4 : nudgeStep;
+        const entry = timeline[activeIdx];
+        let moved = false;
+
+        if (e.key === 'ArrowLeft')  { e.preventDefault(); entry.offX -= step; moved = true; }
+        if (e.key === 'ArrowRight') { e.preventDefault(); entry.offX += step; moved = true; }
+        if (e.key === 'ArrowUp')    { e.preventDefault(); entry.offY -= step; moved = true; }
+        if (e.key === 'ArrowDown')  { e.preventDefault(); entry.offY += step; moved = true; }
+
+        // Reset offset
+        if (e.key === '0') { HubAudio.play('back'); entry.offX = 0; entry.offY = 0; moved = true; }
+
+        if (moved) { HubAudio.play('cursor'); renderCanvas(); updateActiveInfo(); }
+    });
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  EXPORT
+    // ══════════════════════════════════════════════════════════════════════
+    exportBtn.addEventListener('click', exportSheet);
+
+    function exportSheet() {
+        if (timeline.length === 0) return;
+
+        loadingOverlay.querySelector('.loading-text').textContent    = 'EXPORTING';
+        loadingOverlay.querySelector('.loading-subtext').textContent = `Compositing ${timeline.length} frames...`;
+        loadingOverlay.classList.add('active');
+
+        setTimeout(() => {
+            const { w, h } = getBaseSize();
+            const cols = Math.min(COLS, timeline.length);
+            const rows = Math.ceil(timeline.length / COLS);
+
+            const out = document.createElement('canvas');
+            out.width  = w * cols;
+            out.height = h * rows;
+            const octx = out.getContext('2d');
+
+            timeline.forEach((entry, i) => {
+                const frame = importedFrames.find(f => f.id === entry.frameId);
+                if (!frame) return;
+                const col = i % COLS;
+                const row = Math.floor(i / COLS);
+                // clamp offset into tile bounds
+                const ox = Math.max(-(w-1), Math.min(w-1, entry.offX));
+                const oy = Math.max(-(h-1), Math.min(h-1, entry.offY));
+                octx.drawImage(frame.img, col * w + ox, row * h + oy, w, h);
+            });
+
+            out.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `onionskin_sheet_${timeline.length}frames.png`;
+                a.click();
+                setTimeout(() => URL.revokeObjectURL(url), 100);
+
+                HubAudio.play('chord');
+                loadingOverlay.querySelector('.loading-text').textContent    = 'SUCCESS';
+                loadingOverlay.querySelector('.loading-subtext').textContent = 'Sheet downloaded!';
+                setTimeout(() => loadingOverlay.classList.remove('active'), 800);
+            }, 'image/png');
+        }, 200);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  INIT
+    // ══════════════════════════════════════════════════════════════════════
+    renderCanvas();
+    </script>
+</body>
+</html>

@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tap BPM — Hub</title>
+    <link rel="stylesheet" href="hub.css">
+    <script src="hub-audio.js"></script>
+    <style>
+        /* ── Layout: this tool fills the viewport below the nav ── */
+        body { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+        .tool-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 40px;
+            position: relative;
+            z-index: 2;
+            padding: 20px;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        /* ── BIG BPM DISPLAY ── */
+        .bpm-display-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .bpm-number {
+            font-family: 'Syne', sans-serif;
+            font-size: clamp(5rem, 18vw, 12rem);
+            font-weight: 800;
+            color: var(--accent-cyan);
+            line-height: 1;
+            letter-spacing: -4px;
+            text-shadow: 0 0 60px rgba(0, 255, 255, 0.4);
+            transition: color 0.1s ease, text-shadow 0.1s ease;
+            user-select: none;
+        }
+
+        .bpm-number.flash {
+            color: var(--accent-pink);
+            text-shadow: 0 0 80px rgba(255, 0, 255, 0.7);
+        }
+
+        .bpm-label {
+            font-family: 'Syne', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 800;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 6px;
+        }
+
+        .bpm-confidence {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            height: 18px; /* reserve space */
+            transition: opacity 0.3s ease;
+        }
+
+        /* ── TAP BUTTON ── */
+        .tap-btn {
+            width: clamp(160px, 28vw, 260px);
+            height: clamp(160px, 28vw, 260px);
+            border-radius: 50%;
+            border: 3px solid var(--border);
+            background: var(--surface);
+            cursor: pointer;
+            position: relative;
+            transition: all 0.08s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 6px;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .tap-btn::before {
+            content: '';
+            position: absolute; inset: -3px;
+            border-radius: 50%;
+            padding: 3px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-pink));
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .tap-btn:hover::before { opacity: 1; animation: borderRotate 2s linear infinite; }
+
+        .tap-btn:hover {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 50px rgba(0, 255, 255, 0.25);
+            transform: scale(1.03);
+        }
+
+        .tap-btn:active, .tap-btn.tapped {
+            transform: scale(0.93);
+            border-color: var(--accent-pink);
+            background: rgba(255, 0, 255, 0.08);
+            box-shadow: 0 0 60px rgba(255, 0, 255, 0.4);
+        }
+
+        .tap-btn-label {
+            font-family: 'Syne', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: var(--text-light);
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            pointer-events: none;
+        }
+
+        .tap-btn-sub {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            pointer-events: none;
+        }
+
+        /* Ripple ring on tap */
+        .tap-ripple {
+            position: absolute;
+            width: 100%; height: 100%;
+            border-radius: 50%;
+            border: 2px solid var(--accent-pink);
+            opacity: 0;
+            pointer-events: none;
+            animation: tapRipple 0.6s ease-out forwards;
+        }
+
+        @keyframes tapRipple {
+            0%   { transform: scale(1);   opacity: 0.8; }
+            100% { transform: scale(1.6); opacity: 0; }
+        }
+
+        /* ── METRONOME PULSE BAR ── */
+        .pulse-bar-wrap {
+            display: flex;
+            gap: 8px;
+            height: 40px;
+            align-items: flex-end;
+        }
+
+        .pulse-bar {
+            width: 6px;
+            border-radius: 3px;
+            background: var(--border);
+            transition: height 0.1s ease, background 0.1s ease;
+        }
+
+        .pulse-bar.beat {
+            background: var(--accent-cyan);
+            animation: barBeat 0.3s ease-out forwards;
+        }
+
+        @keyframes barBeat {
+            0%   { height: 40px; background: var(--accent-pink); }
+            100% { height: 8px;  background: var(--border); }
+        }
+
+        /* ── STATS ROW ── */
+        .stats-row {
+            display: flex;
+            gap: 24px;
+            align-items: center;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .stat-value {
+            font-family: 'Syne', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: var(--text-light);
+        }
+
+        .stat-label {
+            font-size: 0.58rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .stat-divider {
+            width: 1px;
+            height: 30px;
+            background: var(--border);
+        }
+
+        /* ── CONTROLS ROW ── */
+        .controls-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        /* ── TIMEOUT BAR ── */
+        .timeout-bar-wrap {
+            width: clamp(200px, 40vw, 360px);
+            height: 3px;
+            background: var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .timeout-bar-wrap.visible { opacity: 1; }
+
+        .timeout-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-pink));
+            border-radius: 2px;
+            transition: width linear;
+        }
+
+        /* ── HUB NAV overrides for full-height ── */
+        .hub-nav { flex-shrink: 0; }
+    </style>
+</head>
+<body>
+
+    <!-- Hub Nav -->
+    <nav class="hub-nav">
+        <a class="hub-nav-brand" href="hub.html">
+            <span class="hub-nav-brand-diamond"></span>
+            Dev Hub
+        </a>
+        <div class="hub-nav-title">◈ Tap BPM</div>
+    </nav>
+
+    <!-- Tool Body -->
+    <div class="tool-body">
+
+        <!-- BPM Number -->
+        <div class="bpm-display-wrap">
+            <div class="bpm-number" id="bpmDisplay">—</div>
+            <div class="bpm-label">BPM</div>
+            <div class="bpm-confidence" id="bpmConfidence"></div>
+        </div>
+
+        <!-- Pulse Bars (8 bars = visual metronome) -->
+        <div class="pulse-bar-wrap" id="pulseBars">
+            <div class="pulse-bar" style="height:8px"></div>
+            <div class="pulse-bar" style="height:8px"></div>
+            <div class="pulse-bar" style="height:8px"></div>
+            <div class="pulse-bar" style="height:8px"></div>
+            <div class="pulse-bar" style="height:8px"></div>
+            <div class="pulse-bar" style="height:8px"></div>
+            <div class="pulse-bar" style="height:8px"></div>
+            <div class="pulse-bar" style="height:8px"></div>
+        </div>
+
+        <!-- Tap Button -->
+        <button class="tap-btn" id="tapBtn" aria-label="Tap to detect BPM">
+            <span class="tap-btn-label">TAP</span>
+            <span class="tap-btn-sub">or press Space</span>
+        </button>
+
+        <!-- Timeout Bar -->
+        <div class="timeout-bar-wrap" id="timeoutBarWrap">
+            <div class="timeout-bar" id="timeoutBar"></div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-row">
+            <div class="stat-item">
+                <div class="stat-value" id="statTaps">0</div>
+                <div class="stat-label">Taps</div>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+                <div class="stat-value" id="statMin">—</div>
+                <div class="stat-label">Min BPM</div>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+                <div class="stat-value" id="statMax">—</div>
+                <div class="stat-label">Max BPM</div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls-row">
+            <button class="btn-secondary" id="resetBtn">
+                <span class="btn-icon">↺</span> Reset
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        const tapBtn        = document.getElementById('tapBtn');
+        const bpmDisplay    = document.getElementById('bpmDisplay');
+        const bpmConfidence = document.getElementById('bpmConfidence');
+        const statTaps      = document.getElementById('statTaps');
+        const statMin       = document.getElementById('statMin');
+        const statMax       = document.getElementById('statMax');
+        const resetBtn      = document.getElementById('resetBtn');
+        const pulseBars     = document.getElementById('pulseBars').children;
+        const timeoutBarWrap = document.getElementById('timeoutBarWrap');
+        const timeoutBar     = document.getElementById('timeoutBar');
+
+        const RESET_TIMEOUT  = 3000;  // ms of silence before auto-reset
+        const MIN_TAPS       = 2;     // need at least 2 taps to calc BPM
+        const KEEP_LAST_TAPS = 8;     // rolling window for BPM averaging
+
+        let taps = [];
+        let resetTimer = null;
+        let timeoutAnim = null;
+        let barIndex = 0;
+        let allBpms = [];
+
+        /* ── Core: register a tap ── */
+        function registerTap() {
+            const now = performance.now();
+            HubAudio.play('select');
+            taps.push(now);
+
+            // Keep only the last N taps for a rolling average
+            if (taps.length > KEEP_LAST_TAPS + 1) taps.shift();
+
+            // Visual feedback
+            flashButton();
+            animateBar();
+            flashBpmNumber();
+
+            // Calc BPM
+            if (taps.length >= MIN_TAPS + 1) {
+                const intervals = [];
+                for (let i = 1; i < taps.length; i++) {
+                    intervals.push(taps[i] - taps[i - 1]);
+                }
+                const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+                const bpm = Math.round(60000 / avgInterval);
+
+                allBpms.push(bpm);
+                updateDisplay(bpm);
+            }
+
+            updateStats();
+            scheduleReset();
+        }
+
+        function updateDisplay(bpm) {
+            bpmDisplay.textContent = bpm;
+            const tapsUsed = Math.min(taps.length - 1, KEEP_LAST_TAPS);
+            if (tapsUsed < 4)       bpmConfidence.textContent = `${tapsUsed} tap${tapsUsed !== 1 ? 's' : ''} — keep going`;
+            else if (tapsUsed < 6)  bpmConfidence.textContent = `${tapsUsed} taps — getting accurate`;
+            else                    bpmConfidence.textContent = `${tapsUsed} taps — locked in`;
+        }
+
+        function updateStats() {
+            statTaps.textContent = taps.length;
+            if (allBpms.length > 0) {
+                statMin.textContent = Math.min(...allBpms);
+                statMax.textContent = Math.max(...allBpms);
+            }
+        }
+
+        /* ── Visual feedback ── */
+        function flashButton() {
+            tapBtn.classList.add('tapped');
+            // Ripple
+            const ripple = document.createElement('div');
+            ripple.className = 'tap-ripple';
+            tapBtn.appendChild(ripple);
+            ripple.addEventListener('animationend', () => ripple.remove());
+            setTimeout(() => tapBtn.classList.remove('tapped'), 80);
+        }
+
+        function animateBar() {
+            const bar = pulseBars[barIndex % 8];
+            bar.classList.remove('beat');
+            // Force reflow to restart animation
+            void bar.offsetWidth;
+            bar.classList.add('beat');
+            barIndex++;
+        }
+
+        function flashBpmNumber() {
+            bpmDisplay.classList.add('flash');
+            setTimeout(() => bpmDisplay.classList.remove('flash'), 100);
+        }
+
+        /* ── Auto-reset after silence ── */
+        function scheduleReset() {
+            clearTimeout(resetTimer);
+            if (timeoutAnim) { cancelAnimationFrame(timeoutAnim); }
+
+            timeoutBarWrap.classList.add('visible');
+            timeoutBar.style.transition = 'none';
+            timeoutBar.style.width = '100%';
+
+            // Animate bar draining
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    timeoutBar.style.transition = `width ${RESET_TIMEOUT}ms linear`;
+                    timeoutBar.style.width = '0%';
+                });
+            });
+
+            resetTimer = setTimeout(() => {
+                softReset();
+            }, RESET_TIMEOUT);
+        }
+
+        /* Soft reset: clear taps but keep the BPM reading on screen */
+        function softReset() {
+            taps = [];
+            allBpms = [];
+            bpmConfidence.textContent = '';
+            statTaps.textContent = '0';
+            statMin.textContent = '—';
+            statMax.textContent = '—';
+            timeoutBarWrap.classList.remove('visible');
+            clearTimeout(resetTimer);
+        }
+
+        /* Hard reset: clears everything including the display */
+        function hardReset() {
+            HubAudio.play('back');
+            softReset();
+            bpmDisplay.textContent = '—';
+            barIndex = 0;
+        }
+
+        /* ── Events ── */
+        tapBtn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            registerTap();
+        });
+
+        tapBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            registerTap();
+        }, { passive: false });
+
+        resetBtn.addEventListener('click', hardReset);
+
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && !e.repeat) {
+                e.preventDefault();
+                registerTap();
+            }
+            if (e.code === 'Escape' || e.code === 'KeyR') {
+                hardReset();
+            }
+        });
+    </script>
+</body>
+</html>

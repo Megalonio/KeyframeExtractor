@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sheet Slicer — Hub</title>
+    <link rel="stylesheet" href="hub.css">
+    <script src="hub-audio.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        body { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+        /* ── DROP SCREEN ── */
+        #dropScreen {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            z-index: 2;
+        }
+
+        .upload-zone { padding: 60px 100px; }
+
+        /* ── EDITOR SCREEN ── */
+        #editorScreen {
+            flex: 1;
+            display: none;
+            flex-direction: row;
+            min-height: 0;
+            position: relative;
+            z-index: 2;
+        }
+
+        /* ── LEFT: controls ── */
+        .controls-panel {
+            width: 240px;
+            flex-shrink: 0;
+            background: var(--bg-darker);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border) transparent;
+        }
+
+        .ctrl-section {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .ctrl-section-title {
+            font-size: 0.55rem;
+            font-weight: 700;
+            color: var(--accent-pink);
+            text-transform: uppercase;
+            letter-spacing: 2.5px;
+            margin-bottom: 12px;
+        }
+
+        /* Mode toggle */
+        .mode-toggle {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-bottom: 0;
+        }
+
+        .mode-btn {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 8px 6px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-align: center;
+            line-height: 1.4;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .mode-btn:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+        .mode-btn.active {
+            border-color: var(--accent-cyan);
+            background: var(--accent-cyan);
+            color: var(--bg-dark);
+        }
+
+        /* Input fields */
+        .field-row {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+
+        .field-row:last-child { margin-bottom: 0; }
+
+        .field-label {
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+
+        .field-input {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 8px 10px;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--text-light);
+            width: 100%;
+            transition: border-color 0.15s ease;
+        }
+
+        .field-input:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+        }
+
+        /* Image info */
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .info-cell {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 6px 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .info-cell-label {
+            font-size: 0.52rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+
+        .info-cell-value {
+            font-size: 0.8rem;
+            color: var(--accent-cyan);
+            font-weight: 700;
+        }
+
+        /* Slice result */
+        .slice-result {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .slice-result-val {
+            font-family: 'Syne', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: var(--accent-cyan);
+            text-align: center;
+            text-shadow: 0 0 20px rgba(0,255,255,0.3);
+        }
+
+        .slice-result-sub {
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+
+        .slice-result-warn {
+            font-size: 0.6rem;
+            color: var(--accent-pink);
+            text-align: center;
+            min-height: 16px;
+        }
+
+        /* Export button area */
+        .export-area {
+            padding: 14px 16px;
+            margin-top: auto;
+            border-top: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .reset-link {
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            text-align: center;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            transition: color 0.15s ease;
+        }
+
+        .reset-link:hover { color: var(--accent-pink); }
+
+        /* ── RIGHT: preview ── */
+        .preview-panel {
+            flex: 1;
+            min-width: 0;
+            background: #000;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* checkerboard */
+        .preview-panel::before {
+            content: '';
+            position: absolute; inset: 0;
+            background-image:
+                linear-gradient(45deg, #111 25%, transparent 25%),
+                linear-gradient(-45deg, #111 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #111 75%),
+                linear-gradient(-45deg, transparent 75%, #111 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            opacity: 0.5;
+        }
+
+        #previewCanvas {
+            position: relative;
+            z-index: 1;
+            max-width: 100%;
+            max-height: 100%;
+            image-rendering: pixelated;
+            object-fit: contain;
+        }
+
+        /* Grid overlay canvas */
+        #gridCanvas {
+            position: absolute;
+            z-index: 2;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            image-rendering: pixelated;
+        }
+
+        /* Loading overlay */
+        #loadingOverlay { display: none; }
+        #loadingOverlay.active { display: flex; }
+    </style>
+</head>
+<body>
+
+    <nav class="hub-nav">
+        <a class="hub-nav-brand" href="hub.html">
+            <span class="hub-nav-brand-diamond"></span>
+            Dev Hub
+        </a>
+        <div class="hub-nav-title">✂ Sheet Slicer</div>
+    </nav>
+
+    <div id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">SLICING</div>
+        <div class="loading-subtext">Extracting frames...</div>
+    </div>
+
+    <!-- DROP SCREEN -->
+    <div id="dropScreen">
+        <div class="upload-zone" id="uploadZone">
+            <div class="upload-icon">
+                <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+                    <rect x="8" y="8" width="64" height="48" rx="4" stroke="currentColor" stroke-width="3"/>
+                    <line x1="8" y1="28" x2="72" y2="28" stroke="currentColor" stroke-width="2" opacity="0.5"/>
+                    <line x1="8" y1="48" x2="72" y2="48" stroke="currentColor" stroke-width="2" opacity="0.5"/>
+                    <line x1="29" y1="8" x2="29" y2="56" stroke="currentColor" stroke-width="2" opacity="0.5"/>
+                    <line x1="51" y1="8" x2="51" y2="56" stroke="currentColor" stroke-width="2" opacity="0.5"/>
+                    <path d="M30 64H50M40 64V72" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <div class="upload-text">Drop Sprite Sheet</div>
+            <div class="upload-hint">or click to browse • PNG, JPG, WebP</div>
+            <input type="file" id="fileInput" accept="image/*" style="display:none">
+        </div>
+    </div>
+
+    <!-- EDITOR SCREEN -->
+    <div id="editorScreen">
+
+        <!-- Controls -->
+        <div class="controls-panel">
+
+            <div class="ctrl-section">
+                <div class="ctrl-section-title">Image Info</div>
+                <div class="info-grid">
+                    <div class="info-cell">
+                        <div class="info-cell-label">Width</div>
+                        <div class="info-cell-value" id="infoW">—</div>
+                    </div>
+                    <div class="info-cell">
+                        <div class="info-cell-label">Height</div>
+                        <div class="info-cell-value" id="infoH">—</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ctrl-section">
+                <div class="ctrl-section-title">Define Frames By</div>
+                <div class="mode-toggle">
+                    <button class="mode-btn active" id="modePixel" data-mode="pixel">
+                        Pixel<br>Size
+                    </button>
+                    <button class="mode-btn" id="modeCount" data-mode="count">
+                        Frame<br>Count
+                    </button>
+                </div>
+            </div>
+
+            <!-- Pixel size mode -->
+            <div class="ctrl-section" id="pixelSection">
+                <div class="ctrl-section-title">Frame Size (px)</div>
+                <div class="field-row">
+                    <div class="field-label">Frame Width</div>
+                    <input class="field-input" type="number" id="frameW" min="1" value="32" placeholder="e.g. 32">
+                </div>
+                <div class="field-row">
+                    <div class="field-label">Frame Height</div>
+                    <input class="field-input" type="number" id="frameH" min="1" value="32" placeholder="e.g. 32">
+                </div>
+            </div>
+
+            <!-- Count mode -->
+            <div class="ctrl-section" id="countSection" style="display:none">
+                <div class="ctrl-section-title">Frame Count</div>
+                <div class="field-row">
+                    <div class="field-label">Columns (across)</div>
+                    <input class="field-input" type="number" id="colCount" min="1" value="4" placeholder="e.g. 4">
+                </div>
+                <div class="field-row">
+                    <div class="field-label">Rows (tall)</div>
+                    <input class="field-input" type="number" id="rowCount" min="1" value="4" placeholder="e.g. 4">
+                </div>
+            </div>
+
+            <div class="ctrl-section">
+                <div class="ctrl-section-title">Result</div>
+                <div class="slice-result">
+                    <div class="slice-result-val" id="resultVal">—</div>
+                    <div class="slice-result-sub" id="resultSub">frames detected</div>
+                    <div class="slice-result-warn" id="resultWarn"></div>
+                </div>
+            </div>
+
+            <div class="export-area">
+                <button class="btn-primary" id="exportBtn" style="width:100%;justify-content:center;" disabled>
+                    <span class="btn-icon">↓</span> Export ZIP
+                </button>
+                <div class="reset-link" id="resetBtn">↺ Load different image</div>
+            </div>
+
+        </div>
+
+        <!-- Preview -->
+        <div class="preview-panel" id="previewPanel">
+            <canvas id="previewCanvas"></canvas>
+            <canvas id="gridCanvas"></canvas>
+        </div>
+
+    </div>
+
+    <input type="file" id="fileInput2" accept="image/*" style="display:none">
+
+    <script>
+    // ══════════════════════════════════════════════════════════════════════
+    //  STATE
+    // ══════════════════════════════════════════════════════════════════════
+    let sourceImg  = null;
+    let mode       = 'pixel'; // 'pixel' | 'count'
+    let sliceW     = 32;
+    let sliceH     = 32;
+    let cols       = 4;
+    let rows       = 4;
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  DOM
+    // ══════════════════════════════════════════════════════════════════════
+    const dropScreen    = document.getElementById('dropScreen');
+    const editorScreen  = document.getElementById('editorScreen');
+    const uploadZone    = document.getElementById('uploadZone');
+    const fileInput     = document.getElementById('fileInput');
+    const loadingOverlay= document.getElementById('loadingOverlay');
+    const previewCanvas = document.getElementById('previewCanvas');
+    const gridCanvas    = document.getElementById('gridCanvas');
+    const exportBtn     = document.getElementById('exportBtn');
+    const resetBtn      = document.getElementById('resetBtn');
+
+    const infoW       = document.getElementById('infoW');
+    const infoH       = document.getElementById('infoH');
+    const resultVal   = document.getElementById('resultVal');
+    const resultSub   = document.getElementById('resultSub');
+    const resultWarn  = document.getElementById('resultWarn');
+
+    const frameWInput = document.getElementById('frameW');
+    const frameHInput = document.getElementById('frameH');
+    const colInput    = document.getElementById('colCount');
+    const rowInput    = document.getElementById('rowCount');
+    const pixelSection= document.getElementById('pixelSection');
+    const countSection= document.getElementById('countSection');
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  FILE LOADING
+    // ══════════════════════════════════════════════════════════════════════
+    uploadZone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', e => { if (e.target.files[0]) loadImage(e.target.files[0]); });
+
+    ['dragenter','dragover','dragleave','drop'].forEach(ev => {
+        uploadZone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); });
+        document.addEventListener(ev, e => e.preventDefault());
+    });
+
+    uploadZone.addEventListener('dragenter', () => uploadZone.classList.add('dragover'));
+    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+    uploadZone.addEventListener('drop', e => {
+        uploadZone.classList.remove('dragover');
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) loadImage(file);
+    });
+
+    document.addEventListener('drop', e => {
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/') && editorScreen.style.display !== 'none') {
+            loadImage(file);
+        }
+    });
+
+    function loadImage(file) {
+        const reader = new FileReader();
+        reader.onload = re => {
+            const img = new Image();
+            img.onload = () => {
+                sourceImg = img;
+                infoW.textContent = img.naturalWidth + 'px';
+                infoH.textContent = img.naturalHeight + 'px';
+
+                // Smart defaults: try to guess square frames
+                const guessSize = gcd(img.naturalWidth, img.naturalHeight);
+                const gs = Math.min(guessSize, 128);
+                frameWInput.value = gs;
+                frameHInput.value = gs;
+                colInput.value = Math.floor(img.naturalWidth / gs);
+                rowInput.value = Math.floor(img.naturalHeight / gs);
+
+                dropScreen.style.display    = 'none';
+                editorScreen.style.display  = 'flex';
+                HubAudio.play('select');
+
+                renderPreview();
+                updateResult();
+            };
+            img.src = re.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  MODE TOGGLE
+    // ══════════════════════════════════════════════════════════════════════
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            HubAudio.play('cursor');
+            mode = btn.dataset.mode;
+            pixelSection.style.display = mode === 'pixel' ? 'block' : 'none';
+            countSection.style.display = mode === 'count' ? 'block' : 'none';
+            syncFromMode();
+            renderPreview();
+            updateResult();
+        });
+    });
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  INPUT EVENTS
+    // ══════════════════════════════════════════════════════════════════════
+    [frameWInput, frameHInput, colInput, rowInput].forEach(inp => {
+        inp.addEventListener('input', () => {
+            syncFromMode();
+            renderPreview();
+            updateResult();
+        });
+    });
+
+    function syncFromMode() {
+        if (!sourceImg) return;
+        if (mode === 'pixel') {
+            sliceW = Math.max(1, parseInt(frameWInput.value) || 1);
+            sliceH = Math.max(1, parseInt(frameHInput.value) || 1);
+            cols   = Math.floor(sourceImg.naturalWidth  / sliceW);
+            rows   = Math.floor(sourceImg.naturalHeight / sliceH);
+        } else {
+            cols   = Math.max(1, parseInt(colInput.value) || 1);
+            rows   = Math.max(1, parseInt(rowInput.value) || 1);
+            sliceW = Math.floor(sourceImg.naturalWidth  / cols);
+            sliceH = Math.floor(sourceImg.naturalHeight / rows);
+        }
+    }
+
+    function updateResult() {
+        if (!sourceImg) return;
+        const total = cols * rows;
+        resultVal.textContent = total;
+        resultSub.textContent = `frame${total !== 1 ? 's' : ''} — ${sliceW}×${sliceH}px each`;
+
+        // Warn if doesn't divide evenly
+        const remW = sourceImg.naturalWidth  % sliceW;
+        const remH = sourceImg.naturalHeight % sliceH;
+        if (remW !== 0 || remH !== 0) {
+            resultWarn.textContent = `⚠ ${remW}px col / ${remH}px row remainder`;
+        } else {
+            resultWarn.textContent = '';
+        }
+
+        exportBtn.disabled = total === 0 || sliceW === 0 || sliceH === 0;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  PREVIEW + GRID OVERLAY
+    // ══════════════════════════════════════════════════════════════════════
+    function renderPreview() {
+        if (!sourceImg) return;
+
+        const panel = document.getElementById('previewPanel');
+        const maxW  = panel.clientWidth  - 32;
+        const maxH  = panel.clientHeight - 32;
+
+        const scale = Math.min(maxW / sourceImg.naturalWidth, maxH / sourceImg.naturalHeight, 8);
+        const dispW = Math.round(sourceImg.naturalWidth  * scale);
+        const dispH = Math.round(sourceImg.naturalHeight * scale);
+
+        // Draw source image
+        previewCanvas.width  = dispW;
+        previewCanvas.height = dispH;
+        const pctx = previewCanvas.getContext('2d');
+        pctx.clearRect(0, 0, dispW, dispH);
+        pctx.drawImage(sourceImg, 0, 0, dispW, dispH);
+
+        // Draw grid overlay
+        gridCanvas.width  = dispW;
+        gridCanvas.height = dispH;
+        gridCanvas.style.width  = dispW + 'px';
+        gridCanvas.style.height = dispH + 'px';
+        const gctx = gridCanvas.getContext('2d');
+        gctx.clearRect(0, 0, dispW, dispH);
+
+        if (sliceW <= 0 || sliceH <= 0) return;
+
+        gctx.strokeStyle = 'rgba(0,255,255,0.6)';
+        gctx.lineWidth   = 1;
+
+        // Vertical lines
+        for (let c = 1; c < cols; c++) {
+            const x = Math.round(c * sliceW * scale);
+            gctx.beginPath();
+            gctx.moveTo(x, 0);
+            gctx.lineTo(x, dispH);
+            gctx.stroke();
+        }
+
+        // Horizontal lines
+        for (let r = 1; r < rows; r++) {
+            const y = Math.round(r * sliceH * scale);
+            gctx.beginPath();
+            gctx.moveTo(0, y);
+            gctx.lineTo(dispW, y);
+            gctx.stroke();
+        }
+
+        // Corner dots at intersections
+        gctx.fillStyle = 'rgba(0,255,255,0.9)';
+        for (let c = 0; c <= cols; c++) {
+            for (let r = 0; r <= rows; r++) {
+                const x = Math.round(c * sliceW * scale);
+                const y = Math.round(r * sliceH * scale);
+                gctx.beginPath();
+                gctx.arc(x, y, 2, 0, Math.PI * 2);
+                gctx.fill();
+            }
+        }
+    }
+
+    // Resize handler
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(renderPreview, 80);
+    });
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  EXPORT
+    // ══════════════════════════════════════════════════════════════════════
+    exportBtn.addEventListener('click', exportZip);
+
+    async function exportZip() {
+        if (!sourceImg || cols === 0 || rows === 0) return;
+
+        const total = cols * rows;
+        loadingOverlay.querySelector('.loading-text').textContent    = 'SLICING';
+        loadingOverlay.querySelector('.loading-subtext').textContent = `Extracting ${total} frames...`;
+        loadingOverlay.classList.add('active');
+
+        await new Promise(r => setTimeout(r, 100)); // let UI update
+
+        const zip = new JSZip();
+        const folder = zip.folder('frames');
+
+        for (let i = 0; i < total; i++) {
+            const c = i % cols;
+            const r = Math.floor(i / cols);
+            const fc = document.createElement('canvas');
+            fc.width  = sliceW;
+            fc.height = sliceH;
+            fc.getContext('2d').drawImage(
+                sourceImg,
+                c * sliceW, r * sliceH, sliceW, sliceH,
+                0, 0, sliceW, sliceH
+            );
+
+            const blob = await new Promise(res => fc.toBlob(res, 'image/png'));
+            const ab   = await blob.arrayBuffer();
+            const pad  = String(i + 1).padStart(3, '0');
+            folder.file(`frame_${pad}.png`, ab);
+
+            if (i % 10 === 0) {
+                loadingOverlay.querySelector('.loading-subtext').textContent =
+                    `Extracted ${i + 1}/${total} frames...`;
+            }
+        }
+
+        const content = await zip.generateAsync({ type: 'blob' });
+        const url = URL.createObjectURL(content);
+        const a = document.createElement('a');
+        a.href     = url;
+        a.download = `frames_${cols}x${rows}_${sliceW}x${sliceH}px.zip`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 100);
+
+        HubAudio.play('chord');
+        loadingOverlay.querySelector('.loading-text').textContent    = 'SUCCESS';
+        loadingOverlay.querySelector('.loading-subtext').textContent = `${total} PNGs zipped!`;
+        setTimeout(() => loadingOverlay.classList.remove('active'), 800);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  RESET
+    // ══════════════════════════════════════════════════════════════════════
+    resetBtn.addEventListener('click', () => {
+        HubAudio.play('back');
+        sourceImg = null;
+        editorScreen.style.display = 'none';
+        dropScreen.style.display   = 'flex';
+        fileInput.value = '';
+    });
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !exportBtn.disabled) exportZip();
+        if (e.key === 'Escape') resetBtn.click();
+    });
+    </script>
+</body>
+</html>
